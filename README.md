@@ -15,7 +15,7 @@
 
 ### macOS
 
-应用搜索、地区切换与下载操作。
+macOS 1.0.3：应用搜索、地区切换与下载操作，侧栏提供本机凭据提取及越狱设备提取入口。
 
 ![macOS 应用搜索](docs/images/macos-search.png)
 
