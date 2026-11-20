@@ -374,8 +374,8 @@ def observe_uid_layer(
         else (program, "observe-uid-layer", str(pid), output, "90")
     )
     command = " ".join(map(shlex.quote, arguments))
-    observer = subprocess.Popen(
-        device.command + [command], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    observer = device.popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
     trigger_process = None
     direct_process = None
@@ -391,8 +391,8 @@ def observe_uid_layer(
                 "FairPlay observer failed: " + ready.decode("utf-8", "replace")
             )
         trigger_command = " ".join(map(shlex.quote, (trigger_program, executable)))
-        trigger_process = subprocess.Popen(
-            device.command + [trigger_command],
+        trigger_process = device.popen(
+            trigger_command,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -404,8 +404,8 @@ def observe_uid_layer(
                 raise RuntimeError(
                     "FairPlay trigger failed: " + failure.decode("utf-8", "replace")
                 )
-            direct_process = subprocess.Popen(
-                device.command + [shlex.quote(executable)],
+            direct_process = device.popen(
+                shlex.quote(executable),
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

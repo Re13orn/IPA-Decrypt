@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 enum ExtractorProcess {
     struct Reply: Decodable { var devices: [JailbreakDevice]?; var path: String?; var error: String?; var message: String?; var licenses: [ExtractionLicense]?; var selection: CredentialLicenseEvidence?; var installedLicenses: [InstalledLicense]? }
-    static func execute(_ arguments: [String], password: String = "", privateKey: URL? = nil) async throws -> Reply {
+    static func execute(_ arguments: [String], password: String = "", privateKey: URL? = nil, rootPassword: String = "") async throws -> Reply {
         try await Task.detached(priority: .userInitiated) {
             guard let resources = Bundle.main.resourceURL else { throw LabError("找不到设备提取组件。") }
             let python = resources.appendingPathComponent("Python/bin/python3")
@@ -20,6 +20,7 @@ enum ExtractorProcess {
             env["PYTHONNOUSERSITE"] = "1"
             env["PYTHONPATH"] = ""
             env["IPA_SSH_PASSWORD"] = password
+            env["IPA_ROOT_PASSWORD"] = rootPassword
             if let privateKey { env["IPA_SSH_KEY"] = privateKey.path }
             process.environment = env
             let output = Pipe(); process.standardOutput = output
@@ -46,6 +47,9 @@ enum ExtractorProcess {
     @State private var tested: String?
     @State private var password = ""
     @State private var revealPassword = false
+    @AppStorage("device-elevation-method") private var elevation = "auto"
+    @State private var rootPassword = ""
+    @State private var revealRootPassword = false
     @AppStorage("device-ssh-user") private var username = "root"
     @State private var privateKey: URL?
     @State private var license: URL?
@@ -79,7 +83,7 @@ enum ExtractorProcess {
         Form {
             Section {
                 Label("从越狱设备提取凭据", systemImage: "iphone.and.arrow.forward").font(.title2.bold())
-                Text("通过 USB 或网络连接已越狱的 iPhone 或 iPad，并确保 root SSH 可用。设备上需安装目标账户获取的 App Store App。提取期间会临时运行关联 App 的副本，完成后清理设备临时文件。").foregroundStyle(.secondary)
+                Text("通过 USB 或网络连接已越狱的 iPhone 或 iPad，并确保可通过 root 登录、sudo 或 su 取得 root 权限。设备上需安装目标账户获取的 App Store App。提取期间会临时运行关联 App 的副本，完成后清理设备临时文件。").foregroundStyle(.secondary)
             }
             Section("连接方式") {
                 Picker("连接", selection: $mode) {
@@ -143,7 +147,19 @@ enum ExtractorProcess {
                     }.buttonStyle(.borderless).help(revealPassword ? "隐藏密码" : "显示密码")
                 }
                 HStack { Text(privateKey?.lastPathComponent ?? "使用默认 SSH 密钥").foregroundStyle(.secondary); Spacer(); Button("选择私钥…") { privateKey = choose() }; if privateKey != nil { Button("清除") { privateKey = nil } } }
-                Text("SSH 密码仅用于本次提取，不保存；设备身份记录按设备隔离。").font(.caption).foregroundStyle(.secondary)
+                Picker("提权方式", selection: $elevation) {
+                    Text("自动（sudo → su）").tag("auto")
+                    Text("sudo").tag("sudo")
+                    Text("su（切换 root）").tag("su")
+                }
+                if elevation != "sudo" {
+                    HStack {
+                        Group { if revealRootPassword { TextField("root 密码（su，可选）", text: $rootPassword) } else { SecureField("root 密码（su，可选）", text: $rootPassword) } }
+                        Button { revealRootPassword.toggle() } label: { Image(systemName: revealRootPassword ? "eye.slash" : "eye") }.buttonStyle(.borderless).help("查看或隐藏 root 密码")
+                    }
+                    Text("sudo 验证当前 SSH 用户；su 验证 root。root 密码留空时仅尝试 SSH 密码，不额外猜测其他密码。").font(.caption).foregroundStyle(.secondary)
+                }
+                Text("SSH 与 root 密码仅用于本次操作，不保存；设备身份记录按设备隔离。").font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button(testing ? "正在测试…" : "测试连接", systemImage: "network") { testConnection() }
                         .disabled(busy || testing || !validConnection)
@@ -224,7 +240,7 @@ enum ExtractorProcess {
                 if let status { Label(status, systemImage: succeeded ? "checkmark.circle.fill" : "info.circle").foregroundStyle(succeeded ? Color.green : .secondary).textSelection(.enabled) }
                 if let output { HStack { Button("导出 credential.bin…") { export(output) }; Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([output]) } } }
             }
-        }.formStyle(.grouped).onDisappear { if let snapshotFolder, !busy { try? FileManager.default.removeItem(at: snapshotFolder) }; revealPassword = false; if !busy && !testing { password = "" } }.disabled(model.action != nil && !busy && !testing).task { if devices.isEmpty { discover() }; if license == nil { owner = model.activeProfile(beta: false)?.owner ?? model.activeProfile(beta: true)?.owner; selectAccountTarget() } }
+        }.formStyle(.grouped).onDisappear { if let snapshotFolder, !busy { try? FileManager.default.removeItem(at: snapshotFolder) }; revealPassword = false; revealRootPassword = false; if !busy && !testing { password = ""; rootPassword = "" } }.disabled(model.action != nil && !busy && !testing).task { if devices.isEmpty { discover() }; if license == nil { owner = model.activeProfile(beta: false)?.owner ?? model.activeProfile(beta: true)?.owner; selectAccountTarget() } }
         .onChange(of: signature) { installed = []; selectedLicenseID = nil; selectedCredentialID = nil; failures = [:]; scannedSignature = nil; output = nil; status = nil }
         .onChange(of: owner) { selectAccountTarget() }
         .onChange(of: targetJob) { if let job = accountJobs.first(where: { $0.id == targetJob }), let url = model.artifact(job, clear: false) { externalSource = false; inspect(url) } else if !externalSource { resetTarget() } }
@@ -282,7 +298,7 @@ enum ExtractorProcess {
         if let old = snapshotFolder { try? FileManager.default.removeItem(at: old) }
         let snapshot = base.appendingPathComponent("licenses-" + UUID().uuidString)
         snapshotFolder = snapshot
-        let reply = try await ExtractorProcess.execute([automatic ? "scan-auto" : "scan"] + arguments + ["--known-hosts", base.appendingPathComponent("known_hosts").path, "--credential-cache", cache.path, "--license-cache", snapshot.path], password: secret, privateKey: key)
+        let reply = try await ExtractorProcess.execute([automatic ? "scan-auto" : "scan"] + arguments + ["--known-hosts", base.appendingPathComponent("known_hosts").path, "--credential-cache", cache.path, "--license-cache", snapshot.path], password: secret, privateKey: key, rootPassword: rootPassword)
         accountReferences = await loadAccountReferences()
         return await annotateAccounts(reply.installedLicenses ?? [])
     }
@@ -355,14 +371,14 @@ enum ExtractorProcess {
     private var validConnection: Bool {
         Int(port).map { (1...65535).contains($0) } == true && (mode == "usb" ? !selected.isEmpty : !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
-    private var signature: String { [mode, selected, host, port, username, privateKey?.path ?? "", String(password.hashValue), String(automaticAuthentication)].joined(separator: "|") }
+    private var signature: String { [mode, selected, host, port, username, elevation, String(rootPassword.hashValue), privateKey?.path ?? "", String(password.hashValue), String(automaticAuthentication)].joined(separator: "|") }
     private func captureDirectory() throws -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("IPADecryptMac/DeviceCaptures")
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         return base
     }
     private func connectionArguments() -> [String] {
-        var args = ["--remote-port", port, "--user", username.trimmingCharacters(in: .whitespacesAndNewlines)]
+        var args = ["--remote-port", port, "--user", username.trimmingCharacters(in: .whitespacesAndNewlines), "--elevation", elevation]
         if mode == "usb" { args += ["--device", selected] }
         else { args += ["--host", host.trimmingCharacters(in: .whitespacesAndNewlines)] }
         return args
@@ -376,7 +392,7 @@ enum ExtractorProcess {
             defer { testing = false; model.action = nil }
             do {
                 let base = try captureDirectory()
-                let reply = try await ExtractorProcess.execute([automatic ? "test-auto" : "test"] + arguments + ["--known-hosts", base.appendingPathComponent("known_hosts").path], password: secret, privateKey: key)
+                let reply = try await ExtractorProcess.execute([automatic ? "test-auto" : "test"] + arguments + ["--known-hosts", base.appendingPathComponent("known_hosts").path], password: secret, privateKey: key, rootPassword: rootPassword)
                 tested = settings; succeeded = true; status = reply.message ?? "SSH 连接成功，root 身份已确认。"
             } catch { status = model.friendly(error) }
         }
@@ -410,7 +426,7 @@ enum ExtractorProcess {
                 var args = [automatic ? "auto" : "extract"] + arguments + ["--output", target.path, "--known-hosts", base.appendingPathComponent("known_hosts").path]
                 args += ["--installed-sinf", deviceLicense.path, "--expected-sinf-hash", deviceLicense.digest]
                 if let ipa, let targetChoice { args += ["--ipa", ipa.path, "--sinf-member", targetChoice.member] }
-                let reply = try await ExtractorProcess.execute(args, password: secret, privateKey: key)
+                let reply = try await ExtractorProcess.execute(args, password: secret, privateKey: key, rootPassword: rootPassword)
                 guard let path = reply.path else { throw LabError("未收到提取结果。") }
                 let file = URL(fileURLWithPath: path)
                 guard AppFileLibrary.contains(file, root: target) else { throw LabError("提取器返回了无效路径。") }
@@ -452,7 +468,7 @@ enum ExtractorProcess {
     private func extractOne(_ item: InstalledLicense, arguments: [String], secret: String, key: URL?, automatic: Bool, base: URL) async throws {
         let target = base.appendingPathComponent(UUID().uuidString)
         let args = [automatic ? "auto" : "extract"] + arguments + ["--output", target.path, "--known-hosts", base.appendingPathComponent("known_hosts").path, "--installed-sinf", item.path, "--expected-sinf-hash", item.digest]
-        let reply = try await ExtractorProcess.execute(args, password: secret, privateKey: key)
+        let reply = try await ExtractorProcess.execute(args, password: secret, privateKey: key, rootPassword: rootPassword)
         guard let path = reply.path, let evidence = reply.selection,
               evidence.user == item.user, evidence.key == item.key, evidence.triggerUser == item.user,
               evidence.triggerKey == item.key, evidence.installedPath == item.path, evidence.installedDigest == item.digest else { throw LabError("返回结果与所选许可证不符。") }

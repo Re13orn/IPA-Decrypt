@@ -220,7 +220,7 @@ class NetworkTests(unittest.TestCase):
     def test_readonly_network_probe_does_not_launch_extractor_or_tunnel(self):
         out = io.StringIO()
         def probe(args, **kwargs):
-            self.assertEqual(args[-1], 'id -u; uname -s; (sw_vers -productVersion 2>/dev/null || true)')
+            self.assertTrue(args[-1].endswith('id -u; uname -s; (sw_vers -productVersion 2>/dev/null || true)'))
             self.assertEqual(args[-2], 'root@192.168.1.20')
             self.assertEqual(kwargs['env']['IPA_DIRECT_SSH'], '1')
             self.assertFalse(any('retrieve.py' in value for value in args))
@@ -261,7 +261,7 @@ class AutomaticTests(unittest.TestCase):
             def run(args, **kwargs):
                 env=kwargs['env']
                 if args[0]=='/usr/bin/ssh':
-                    if args[-1].startswith('id -u;'):
+                    if 'id -u; uname -s;' in args[-1]:
                         logins.append((env['IPA_SSH_USER'], env['IPA_SSH_PASSWORD']))
                         if env['IPA_SSH_USER']=='root':
                             return subprocess.CompletedProcess(args,255,'','Permission denied')
@@ -295,5 +295,69 @@ class AutomaticTests(unittest.TestCase):
             with patch.object(sys,'argv',['host.py','auto']+SELECTED+['--ipa',IPA,'--host','iphone.local','--output',str(Path(temp)/'new'),'--known-hosts',str(Path(temp)/'known')]), patch.object(host.subprocess,'run',run):
                 with self.assertRaisesRegex(RuntimeError,'两组'): host.main()
             self.assertEqual(attempts,['root','mobile'])
+
+class SuTests(unittest.TestCase):
+    def environment(self, method='auto'):
+        return {'IPA_KNOWN_HOSTS':'/tmp/synthetic-known', 'IPA_SSH_USER':'mobile',
+                'IPA_SSH_PASSWORD':'mobile-fixture', 'IPA_ROOT_PASSWORD':'root-fixture', 'IPA_ELEVATION_METHOD':method}
+
+    def test_explicit_su_skips_sudo_and_checks_root(self):
+        env=self.environment('su')
+        process=unittest.mock.Mock(returncode=0)
+        process.communicate.return_value=(b'0\n',b'')
+        with patch.object(host.subprocess,'run',return_value=subprocess.CompletedProcess([],0,'501\nDarwin\n15.7.3\n','')) as run, patch.object(host,'su_start',return_value=(process,b'')) as su:
+            message=host.probe_access('fixture',22,'fixture',env)
+        self.assertEqual(run.call_count,1)
+        self.assertEqual(env['IPA_SUDO_MODE'],'su')
+        self.assertIn('su 已验证',message)
+        self.assertNotIn('root-fixture',message)
+        self.assertEqual(su.call_args.kwargs['env']['IPA_ROOT_PASSWORD'],'root-fixture')
+
+    def test_auto_falls_back_after_sudo_failure(self):
+        env=self.environment(); process=unittest.mock.Mock(returncode=0);process.communicate.return_value=(b'0\n',b'')
+        replies=[subprocess.CompletedProcess([],0,'501\nDarwin\n15.7.3\n',''),subprocess.CompletedProcess([],1,'','no sudo'),subprocess.CompletedProcess([],1,'','no sudo')]
+        with patch.object(host.subprocess,'run',side_effect=replies),patch.object(host,'su_start',return_value=(process,b'')):
+            host.probe_access('fixture',22,'fixture',env)
+        self.assertEqual(env['IPA_SUDO_MODE'],'su')
+
+    def test_sudo_only_does_not_try_su(self):
+        env=self.environment('sudo')
+        replies=[subprocess.CompletedProcess([],0,'501\nDarwin\n15.7.3\n','')]+[subprocess.CompletedProcess([],1,'','denied')]*2
+        with patch.object(host.subprocess,'run',side_effect=replies),patch.object(host,'su_start') as su:
+            with self.assertRaisesRegex(RuntimeError,'sudo'):host.probe_access('fixture',22,'fixture',env)
+            su.assert_not_called()
+
+    def test_su_pty_auth_and_live_observer_stderr(self):
+        import os
+        import native_ssh
+        import ssh_options
+        with tempfile.TemporaryDirectory() as directory:
+            fake=Path(directory)/'ssh'
+            fake.write_text('#!'+sys.executable+'\n'+'import os,re,sys\nassert "-tt" in sys.argv\nassert os.environ["IPA_ROOT_PASSWORD"] not in " ".join(sys.argv)\nos.write(1,b"Password for root: ")\nassert sys.stdin.buffer.readline().strip().decode()==os.environ["IPA_ROOT_PASSWORD"]\nmarker=re.search(r"IPA_SU_READY_[0-9a-f]+",sys.argv[-1]).group().encode()\nos.write(1,b"\\r\\n"+marker+b"\\nobserving FairPlay synthetic\\n")\n')
+            fake.chmod(0o700); env=dict(os.environ,**self.environment(),IPA_SUDO_MODE='su')
+            process,pending=ssh_options.su_start([str(fake),'-T','mobile@fixture'],'observer',env=env)
+            output,_=process.communicate(timeout=5)
+            self.assertEqual(process.returncode,0);self.assertIn(b'observing FairPlay',pending+output)
+            device=native_ssh.SSHDevice.__new__(native_ssh.SSHDevice);device.command=[str(fake),'-T','mobile@fixture']
+            with patch.dict(os.environ,env,clear=True):
+                observer=device.popen('observer',stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+                self.assertEqual(observer.stderr.readline(),b'observing FairPlay synthetic\n')
+                out,err=observer.communicate(timeout=5)
+                self.assertEqual(observer.returncode,0);self.assertEqual(out,b'')
+
+    def test_su_binary_transport_is_non_pty_and_cleanup_runs(self):
+        import ssh_options
+        env=self.environment();binary=bytes(range(256))+b'\x00\r\n'
+        process=unittest.mock.Mock(returncode=0);process.communicate.return_value=(b'',b'')
+        calls=[]
+        def run(args,**kwargs):
+            calls.append((args,kwargs))
+            if args[-1].startswith('cat ') and 'stdout' in args[-1]:return subprocess.CompletedProcess(args,0,binary,b'')
+            return subprocess.CompletedProcess(args,0,b'',b'')
+        with patch('subprocess.run',side_effect=run),patch.object(ssh_options,'su_start',return_value=(process,b'')):
+            reply=ssh_options.su_run(['/usr/bin/ssh','-T','mobile@fixture'],'cat',binary,env=env)
+        self.assertEqual(calls[1][1]['input'],binary);self.assertEqual(reply.stdout,binary)
+        self.assertTrue(calls[-1][0][-1].startswith('rm -rf -- /var/tmp/ipa-su-'))
+        self.assertTrue(all('-tt' not in args for args,_ in calls))
 
 if __name__ == '__main__': unittest.main()

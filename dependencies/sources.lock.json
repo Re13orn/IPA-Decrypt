@@ -72,8 +72,8 @@
       "path": "apps/macos/Resources/Extractor/credential-retrieval",
       "revision": "d81d98b13656c9dbb340f04dd0838137278f44a5",
       "license": "GPL-3.0-only",
-      "tree_sha256": "90566dd5efeb27b7aa91ee7a4d9fd0466b9e86af608098fb45f70799e85b1c68",
-      "files": 37,
+      "tree_sha256": "5802195f0022851ee65a43fa40dfc112a5000cbc24b10db9b28d27b3ec1f30fb",
+      "files": 38,
       "excluded": [
         "build"
       ]

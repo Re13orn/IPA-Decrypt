@@ -5,7 +5,7 @@
 | 平台 | 系统要求 | 安装附件 |
 | --- | --- | --- |
 | iOS | iOS 16 及以上 | [IPA-Decrypt-iOS-1.0.0-unsigned.ipa](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.0/IPA-Decrypt-iOS-1.0.0-unsigned.ipa) |
-| macOS | Apple Silicon · macOS 15 及以上 | `IPA-Decrypt-macOS-1.0.2-arm64.dmg` |
+| macOS | Apple Silicon · macOS 15 及以上 | `IPA-Decrypt-macOS-1.0.3-arm64.dmg` |
 
 从 [Releases](https://github.com/Re13orn/IPA-Decrypt/releases) 下载附件与对应的 `SHA256SUMS`，在下载目录执行：
 
@@ -67,8 +67,9 @@ FairPlay 凭据为 16 字节数据，对应 32 个十六进制字符。支持 `c
 
 1. 连接并解锁越狱设备，确认 SSH 服务可用。
 2. 在设备提取页选择 USB 或网络连接，填写用户名、端口及认证信息。
-3. 执行连接测试，再扫描并提取许可证对应的凭据。
-4. 从按内容去重的结果中选择需要导入的凭据。
+3. 选择提权方式：自动依次验证 sudo、su，也可直接选择 su。sudo 使用 SSH 当前用户的密码；su 使用 root 密码，可单独填写，留空只尝试 SSH 密码。
+4. 执行连接测试，确认实际取得 root 权限，再扫描并提取许可证对应的凭据。
+5. 从按内容去重的结果中选择需要导入的凭据。
 
 USB 连接通过端口转发访问设备 SSH 服务；网络连接要求 Mac 与设备可互通。
 

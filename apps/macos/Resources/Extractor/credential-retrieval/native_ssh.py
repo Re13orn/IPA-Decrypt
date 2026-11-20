@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ssh_options import command as ssh_command, elevate
+from ssh_options import command as ssh_command, elevate, su_run
 
 import atexit
 import os
@@ -12,6 +12,7 @@ import shlex
 import socket
 import subprocess
 import time
+import sys
 from pathlib import Path
 
 
@@ -60,20 +61,31 @@ class SSHDevice:
         self.run("mkdir -m 755 " + shlex.quote(self.trigger_directory))
 
     def run(self, command: str, data: bytes | None = None) -> bytes:
-        command, data = elevate(command, data)
-        result = subprocess.run(
-            self.command + [command],
-            input=data,
-            capture_output=True,
-            timeout=120,
-            check=False,
-        )
+        if os.environ.get('IPA_SUDO_MODE') == 'su':
+            result = su_run(self.command, command, data)
+        else:
+            command, data = elevate(command, data)
+            result = subprocess.run(
+                self.command + [command], input=data, capture_output=True,
+                timeout=120, check=False,
+            )
         if result.returncode:
             message = (result.stdout + result.stderr).decode("utf-8", "replace")
             raise RuntimeError(
                 f"device command failed ({result.returncode}): {message}"
             )
         return result.stdout
+
+    def popen(self, command, **kwargs):
+        if os.environ.get('IPA_SUDO_MODE') == 'su':
+            return subprocess.Popen([sys.executable, str(Path(__file__).with_name('su_stream.py'))] + self.command + [command], **kwargs)
+        command, payload = elevate(command)
+        if payload is not None:
+            kwargs['stdin'] = subprocess.PIPE
+        process = subprocess.Popen(self.command + [command], **kwargs)
+        if payload is not None:
+            process.stdin.write(payload); process.stdin.flush(); process.stdin.close(); process.stdin = None
+        return process
 
     def processes(self) -> bytes:
         return self.run(shlex.quote(self.ps) + " -e -o pid,comm")

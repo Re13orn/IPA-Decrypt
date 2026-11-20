@@ -14,7 +14,7 @@ import time
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT/'credential-retrieval'))
-from ssh_options import command as ssh_command
+from ssh_options import command as ssh_command, su_start, BOOTSTRAP_PATH
 UDID = re.compile(r'(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{8}-[0-9a-fA-F]{16})')
 
 
@@ -100,25 +100,37 @@ def connection(args):
 
 def probe_access(host, port, alias, env):
     command = ssh_command(host, port, alias, env=env)
-    result = subprocess.run(command + ['id -u; uname -s; (sw_vers -productVersion 2>/dev/null || true)'], capture_output=True, text=True, env=env, timeout=30)
+    result = subprocess.run(command + [BOOTSTRAP_PATH + 'id -u; uname -s; (sw_vers -productVersion 2>/dev/null || true)'], capture_output=True, text=True, env=env, timeout=30)
     if result.returncode: raise RuntimeError(failure(result))
     lines = result.stdout.strip().splitlines()
     if len(lines) < 2 or not lines[0].isdigit() or lines[1] != 'Darwin':
         raise RuntimeError('SSH 已连接，但不是受支持的 iOS 会话。')
     env['IPA_SUDO_MODE'] = 'none'
     if lines[0] != '0':
-        check = subprocess.run(command + ["sudo -n -- /bin/sh -c 'id -u'"], capture_output=True, text=True, env=env, timeout=15)
-        if check.returncode == 0 and check.stdout.strip() == '0':
-            env['IPA_SUDO_MODE'] = 'nopasswd'
-        elif env.get('IPA_SSH_PASSWORD'):
-            check = subprocess.run(command + ["sudo -k -S -p '' -- /bin/sh -c 'id -u'"], input=env['IPA_SSH_PASSWORD'] + '\n', capture_output=True, text=True, env=env, timeout=15)
-            if check.returncode != 0 or check.stdout.strip() != '0':
-                raise RuntimeError('SSH 登录成功，但当前账户不能通过 sudo 取得提取权限。请使用有权限的账户。')
-            env['IPA_SUDO_MODE'] = 'password'
-        else:
-            raise RuntimeError('SSH 登录成功，提取还需要 sudo 权限，请填写该账户的 sudo 密码。')
+        method = env.get('IPA_ELEVATION_METHOD', 'auto')
+        sudo_ok = False
+        if method != 'su':
+            check = subprocess.run(command + [BOOTSTRAP_PATH + "sudo -n -- sh -c 'id -u'"], capture_output=True, text=True, env=env, timeout=15)
+            if check.returncode == 0 and check.stdout.strip() == '0':
+                env['IPA_SUDO_MODE'] = 'nopasswd'; sudo_ok = True
+            elif env.get('IPA_SSH_PASSWORD'):
+                check = subprocess.run(command + [BOOTSTRAP_PATH + "sudo -k -S -p '' -- sh -c 'id -u'"], input=env['IPA_SSH_PASSWORD'] + '\n', capture_output=True, text=True, env=env, timeout=15)
+                if check.returncode == 0 and check.stdout.strip() == '0':
+                    env['IPA_SUDO_MODE'] = 'password'; sudo_ok = True
+        if not sudo_ok:
+            if method == 'sudo':
+                raise RuntimeError('SSH 登录成功，但 sudo 未取得 root 权限。可改用 su，并填写 root 提权密码。')
+            process, pending = su_start(command, 'id -u', env=env)
+            try:
+                output, _ = process.communicate(timeout=15)
+            except BaseException:
+                process.kill(); process.communicate(); raise
+            if process.returncode or (pending + output).strip() != b'0':
+                raise RuntimeError('SSH 登录成功，但 su 未取得 root 权限。请核对 root 提权密码。')
+            env['IPA_SUDO_MODE'] = 'su'
     version = next((line for line in lines[2:] if re.fullmatch(r'\d+(?:\.\d+){1,2}', line)), None)
-    return 'SSH 连接成功 · ' + env['IPA_SSH_USER'] + (' · sudo 已验证' if env['IPA_SUDO_MODE'] != 'none' else ' · root 权限已确认') + (' · 系统 ' + version if version else '')
+    mode = env['IPA_SUDO_MODE']
+    return 'SSH 连接成功 · ' + env['IPA_SSH_USER'] + (' · su 已验证' if mode == 'su' else ' · sudo 已验证' if mode != 'none' else ' · root 权限已确认') + (' · 系统 ' + version if version else '')
 
 
 def main():
@@ -126,6 +138,7 @@ def main():
     parser.add_argument('operation',choices=['devices','test','extract','auto','inspect','scan','scan-auto','test-auto'])
     parser.add_argument('--device',default='')
     parser.add_argument('--user',default='root')
+    parser.add_argument('--elevation',choices=['auto','sudo','su'],default='auto')
     parser.add_argument('--host',default='')
     parser.add_argument('--remote-port',type=int,default=22)
     parser.add_argument('--output')
@@ -170,6 +183,7 @@ def main():
         raise RuntimeError('请输入有效 SSH 用户名。')
     with connection(args) as (host,port,alias,env):
         env['IPA_SSH_USER'] = args.user
+        env['IPA_ELEVATION_METHOD'] = args.elevation
         env.pop('IPA_SUDO_MODE', None)
         if args.operation in ('auto','scan-auto','test-auto'):
             # Only the two pairs explicitly requested by the device owner.
@@ -223,7 +237,7 @@ def main():
         except (ValueError, KeyError, OSError):
             raise RuntimeError('返回凭据未通过目标许可证校验，未保存到账户。')
         os.chmod(output,0o700);os.chmod(credential,0o600)
-        print(json.dumps(dict(path=str(credential), selection=selection, message='已通过 ' + env['IPA_SSH_USER'] + (' + sudo' if env.get('IPA_SUDO_MODE') != 'none' else '') + ' 提取凭据。'), ensure_ascii=False))
+        print(json.dumps(dict(path=str(credential), selection=selection, message='已通过 ' + env['IPA_SSH_USER'] + (' + su' if env.get('IPA_SUDO_MODE') == 'su' else ' + sudo' if env.get('IPA_SUDO_MODE') != 'none' else '') + ' 提取凭据。'), ensure_ascii=False))
 
 if __name__=='__main__':
     try: main()
