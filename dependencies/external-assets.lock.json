@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "policy": "Never export; local import requires explicit local-only option and exact digest",
+  "assets": [
+    {
+      "path": "apps/ios/App/NativeStoreRuntime/state-store.mjs",
+      "sha256": "24584d8d8119a1ca68bd8e7eefec48edb7701fea7a1d19200736d273a0fd7c83",
+      "bytes": 1000,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/ios/App/NativeStoreRuntime/sap.wasm",
+      "sha256": "d5cedb84045079836df67f4708572068a4bd79ddc9b6fff46173d169ad8d43c9",
+      "bytes": 53890585,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/ios/App/NativeStoreRuntime/crypto-api.mjs",
+      "sha256": "07505667b4a107856a3755b07eaae63759f1210be5532cfbcb9a2852a5ef72ed",
+      "bytes": 5636,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/ios/App/NativeStoreRuntime/unicorn_x86.js",
+      "sha256": "e041d2f45fee7ce7d079b254d014d66606c1a5930afc78937d1b9862e856af69",
+      "bytes": 1138968,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/ios/App/NativeStoreRuntime/amd-generator.mjs",
+      "sha256": "0101f5829d65ca9b8715067af3eadbe29f29c294bf465b6559d1b686966336ce",
+      "bytes": 4967,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/ios/App/NativeStoreRuntime/crypto-worker.js",
+      "sha256": "69cf6e75b85f3b3435ac79ffeecbea5bbd0e8cd7b1168094ed78bd1453dbc8d8",
+      "bytes": 4338,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/macos/Resources/NativeStoreRuntime/state-store.mjs",
+      "sha256": "24584d8d8119a1ca68bd8e7eefec48edb7701fea7a1d19200736d273a0fd7c83",
+      "bytes": 1000,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/macos/Resources/NativeStoreRuntime/sap.wasm",
+      "sha256": "d5cedb84045079836df67f4708572068a4bd79ddc9b6fff46173d169ad8d43c9",
+      "bytes": 53890585,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/macos/Resources/NativeStoreRuntime/crypto-api.mjs",
+      "sha256": "07505667b4a107856a3755b07eaae63759f1210be5532cfbcb9a2852a5ef72ed",
+      "bytes": 5636,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/macos/Resources/NativeStoreRuntime/unicorn_x86.js",
+      "sha256": "e041d2f45fee7ce7d079b254d014d66606c1a5930afc78937d1b9862e856af69",
+      "bytes": 1138968,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/macos/Resources/NativeStoreRuntime/amd-generator.mjs",
+      "sha256": "0101f5829d65ca9b8715067af3eadbe29f29c294bf465b6559d1b686966336ce",
+      "bytes": 4967,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/macos/Resources/NativeStoreRuntime/crypto-worker.js",
+      "sha256": "69cf6e75b85f3b3435ac79ffeecbea5bbd0e8cd7b1168094ed78bd1453dbc8d8",
+      "bytes": 4338,
+      "redistribution": "unverified",
+      "source": "https://github.com/ScriptingApp/Community-Scripts/tree/cb67401c795775a10b7623a6d51b7b7479e45f22"
+    },
+    {
+      "path": "apps/macos/ThirdPartySource/ipatool/internal/store/profile/data_generated.go",
+      "sha256": "0a77c1b8c42f4157befac81779f2233d308b3d67d057d7785f8398021f38d9fc",
+      "bytes": 6708815,
+      "redistribution": "unverified-embedded-Apple-images",
+      "source": "https://github.com/majd/ipatool/tree/3e84853e2e5d60540a5022b64895d496910144eb/internal/store/profile"
+    }
+  ]
+}

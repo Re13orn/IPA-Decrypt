@@ -1,0 +1,41 @@
+{
+  "schema": 2,
+  "maintainer_decision": {
+    "status": "proceed-with-release-preparation",
+    "basis": "Maintainer confirmed proceeding after reviewing the audit and instructed preparation of README, release notes and installation guidance.",
+    "private_repository_publication_authorized": true,
+    "repository_url": "https://github.com/Re13orn/IPA-Decrypt",
+    "repository_visibility": "private",
+    "public_release_performed": false,
+    "private_release_authorized": true,
+    "private_release_url": "https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.0"
+  },
+  "independent_review_completed": false,
+  "review_items": [
+    {
+      "id": "store-runtime-license",
+      "reason": "No redistribution grant located in the pinned Community-Scripts tree or embedded scripting archive for six runtime inputs per platform.",
+      "status": "not-independently-cleared"
+    },
+    {
+      "id": "apple-generated-profile",
+      "reason": "Generated Go embeds compressed Apple framework/plugin pages. Outer project MIT license does not establish rights to underlying images.",
+      "status": "not-independently-cleared"
+    },
+    {
+      "id": "unicorn-combined-license",
+      "reason": "Engine source declares GPLv2 and has mixed file licenses; Python metadata BSD is insufficient. Combined static binary compatibility with project GPL-3.0-only needs review.",
+      "status": "not-independently-cleared"
+    },
+    {
+      "id": "runtime-transitive-notices",
+      "reason": "Exact Python and USB runtime bytes are locked, but standalone Python native libraries, Go transitive notices and binary corresponding-source obligations still require complete review.",
+      "status": "not-independently-cleared"
+    },
+    {
+      "id": "fresh-machine-validation",
+      "reason": "Existing-Mac cache-isolated rebuild passed. No separate clean Mac/VM rebuild or USB source bootstrap validated yet.",
+      "status": "not-independently-cleared"
+    }
+  ]
+}

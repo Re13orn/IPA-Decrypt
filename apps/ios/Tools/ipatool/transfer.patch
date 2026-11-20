@@ -1,0 +1,152 @@
+--- a/pkg/appstore/appstore_download.go
++++ b/pkg/appstore/appstore_download.go
+@@ -69,10 +69,12 @@
+ 	}
+ 
+ 	if res.Data.FailureType == FailureTypePasswordTokenExpired ||
+-		res.Data.FailureType == FailureTypeSignInRequired ||
+-		res.Data.FailureType == FailureTypeDeviceVerificationFailed ||
+-		res.Data.FailureType == FailureTypeLicenseAlreadyExists {
++		res.Data.FailureType == FailureTypeSignInRequired {
+ 		return DownloadOutput{}, ErrPasswordTokenExpired
++	}
++
++	if err := IPALabCommerceFailure(res.Data.FailureType); err != nil {
++		return DownloadOutput{}, err
+ 	}
+ 
+ 	if res.Data.FailureType == FailureTypeLicenseNotFound {
+@@ -314,6 +316,7 @@
+ 		return err
+ 	}
+ 
++	ctx = beginTransfer(ctx, offset, total)
+ 	if complete {
+ 		return nil
+ 	}
+@@ -339,6 +342,8 @@
+ 
+ 		writer = io.MultiWriter(file, progress)
+ 	}
++
++	writer = countTransfer(ctx, writer)
+ 
+ 	// Combining responses requires a strong validator to keep all ranges on
+ 	// the same representation. Servers without one retain the single stream.
+--- a/pkg/appstore/appstore_download_product.go
++++ b/pkg/appstore/appstore_download_product.go
+@@ -162,7 +162,7 @@
+ 	// Download still checks the returned package's platform before publishing it.
+ 	entRes, entErr := t.sendEntDownload(ctx, endpoint, acc, app, guid, "")
+ 	if entErr == nil || entRes.Data.FailureType == FailureTypePasswordTokenExpired ||
+-		entRes.Data.FailureType == FailureTypeLicenseNotFound {
++		entRes.Data.FailureType == FailureTypeLicenseNotFound || entRes.Data.FailureType == FailureTypeDeviceVerificationFailed {
+ 		return entRes, nil
+ 	}
+ 
+@@ -207,7 +207,7 @@
+ 		data.FailureType = strings.TrimSpace(fmt.Sprint(data.Metrics["messageCode"]))
+ 	}
+ 
+-	if data.FailureType == FailureTypeSignInRequired || data.FailureType == FailureTypeDeviceVerificationFailed {
++	if data.FailureType == FailureTypeSignInRequired {
+ 		data.FailureType = FailureTypePasswordTokenExpired
+ 	}
+ 
+@@ -216,7 +216,7 @@
+ 	}
+ 
+ 	message := strings.Join(strings.Fields(data.CustomerMessage), " ")
+-	if strings.EqualFold(message, "sign in to the itunes store") || strings.EqualFold(message, "sign-in required") {
++	if data.FailureType == "" && (strings.EqualFold(message, "sign in to the itunes store") || strings.EqualFold(message, "sign-in required")) {
+ 		data.FailureType = FailureTypePasswordTokenExpired
+ 	}
+ 
+--- a/pkg/appstore/appstore_purchase.go
++++ b/pkg/appstore/appstore_purchase.go
+@@ -76,9 +76,12 @@
+ 
+ 	if res.Data.FailureType == FailureTypePasswordTokenExpired ||
+ 		res.Data.FailureType == FailureTypeSignInRequired ||
+-		res.Data.FailureType == FailureTypeDeviceVerificationFailed ||
+ 		res.Data.CustomerMessage == CustomerMessagePasswordChanged {
+ 		return ErrPasswordTokenExpired
++	}
++
++	if res.Data.FailureType == FailureTypeDeviceVerificationFailed {
++		return IPALabCommerceFailure(res.Data.FailureType)
+ 	}
+ 
+ 	if res.Data.FailureType == FailureTypeLicenseAlreadyExists {
+--- a/pkg/appstore/appstore_get_version_metadata.go
++++ b/pkg/appstore/appstore_get_version_metadata.go
+@@ -47,6 +47,10 @@
+ 
+ 	if res.Data.FailureType == FailureTypePasswordTokenExpired || res.Data.FailureType == FailureTypeSignInRequired {
+ 		return GetVersionMetadataOutput{}, ErrPasswordTokenExpired
++	}
++
++	if err := IPALabCommerceFailure(res.Data.FailureType); err != nil {
++		return GetVersionMetadataOutput{}, err
+ 	}
+ 
+ 	if res.Data.FailureType == FailureTypeLicenseNotFound {
+--- a/pkg/appstore/appstore_list_versions.go
++++ b/pkg/appstore/appstore_list_versions.go
+@@ -60,6 +60,10 @@
+ 		return ListVersionsOutput{}, ErrPasswordTokenExpired
+ 	}
+ 
++	if err := IPALabCommerceFailure(res.Data.FailureType); err != nil {
++		return ListVersionsOutput{}, err
++	}
++
+ 	if res.Data.FailureType == FailureTypeLicenseNotFound {
+ 		return ListVersionsOutput{}, ErrLicenseRequired
+ 	}
+--- a/pkg/appstore/appstore_download_parallel.go
++++ b/pkg/appstore/appstore_download_parallel.go
+@@ -188,6 +188,7 @@
+ 		writer = io.MultiWriter(file, progress)
+ 	}
+ 
++	writer = countTransfer(ctx, writer)
+ 	written, err := io.Copy(writer, io.LimitReader(response.Body, length+1))
+ 	if err != nil {
+ 		return fmt.Errorf("failed to write download part: %w", err)
+--- a/pkg/appstore/appstore_delisted_download_test.go
++++ b/pkg/appstore/appstore_delisted_download_test.go
+@@ -282,7 +282,7 @@
+ 
+ 	It("keeps authentication recovery when an error response also contains items", func() {
+ 		result := downloadResult{FailureType: FailureTypeDeviceVerificationFailed, Items: []downloadItemResult{{}}}
+-		Expect(normalizeDownloadFailure(result).FailureType).To(Equal(FailureTypePasswordTokenExpired))
++		Expect(normalizeDownloadFailure(result).FailureType).To(Equal(FailureTypeDeviceVerificationFailed))
+ 	})
+ 
+ 	DescribeTable("normalizes plist dialogs and metric codes", func(body, expected string) {
+--- a/pkg/appstore/appstore_purchase_test.go
++++ b/pkg/appstore/appstore_purchase_test.go
+@@ -323,13 +323,15 @@
+ 				}, nil)
+ 		})
+ 
+-		It("returns password token expired error", func() {
+-			err := as.Purchase(PurchaseInput{
+-				Account: Account{
+-					StoreFront: "143441",
+-				},
+-			})
+-			Expect(err).To(MatchError(ErrPasswordTokenExpired))
++		It("preserves the device verification error", func() {
++			err := as.Purchase(PurchaseInput{
++				Account: Account{
++					StoreFront: "143441",
++				},
++			})
++			var failure *CommerceFailure
++			Expect(errors.As(err, &failure)).To(BeTrue())
++			Expect(failure.Code).To(Equal(FailureTypeDeviceVerificationFailed))
+ 		})
+ 	})
+ 

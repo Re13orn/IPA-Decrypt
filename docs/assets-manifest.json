@@ -1,0 +1,65 @@
+{
+  "scope": "Native runtime and extraction snapshot; no user credentials",
+  "assets": [
+    {
+      "path": "apps/ios/App/NativeStoreRuntime/sap.wasm",
+      "sha256": "d5cedb84045079836df67f4708572068a4bd79ddc9b6fff46173d169ad8d43c9",
+      "bytes": 53890585,
+      "policy": "local-only pending redistribution review"
+    },
+    {
+      "path": "apps/macos/Resources/Extractor/bundle/arcade-capture.ios",
+      "sha256": "d42e410401e2b3f72b8e88d2605cf8bf3090b961d18b05bf0e954148735ebb38",
+      "bytes": 54592,
+      "policy": "upstream snapshot; see docs/DEPENDENCIES.md"
+    },
+    {
+      "path": "apps/macos/Resources/Extractor/bundle/core4-word-table.bin",
+      "sha256": "6f471504d53746e4f21cc52aabc1ea6ed1be9a130a0bfa7e348139cd8b68a912",
+      "bytes": 262144,
+      "policy": "upstream snapshot; see docs/DEPENDENCIES.md"
+    },
+    {
+      "path": "apps/macos/Resources/Extractor/bundle/credential.ios",
+      "sha256": "87fad2e0647368dc79a4adeaf47fd760b3a21e6cfddad02c445f8ee4aa189e15",
+      "bytes": 191328,
+      "policy": "upstream snapshot; see docs/DEPENDENCIES.md"
+    },
+    {
+      "path": "apps/macos/Resources/Extractor/bundle/driver.ios",
+      "sha256": "085ba773744c39948d5fc427e496192df62f7b5048e7b1585621e96bc8505141",
+      "bytes": 53280,
+      "policy": "upstream snapshot; see docs/DEPENDENCIES.md"
+    },
+    {
+      "path": "apps/macos/Resources/Extractor/bundle/static-key-table.bin",
+      "sha256": "c7b33507f71d5f7a07f623eb21f6b9f23997f950119371631f6535f63e6d2af1",
+      "bytes": 4096,
+      "policy": "upstream snapshot; see docs/DEPENDENCIES.md"
+    },
+    {
+      "path": "apps/macos/Resources/Extractor/bundle/trigger.ios",
+      "sha256": "8339732de46549020f6dfb114335ece298b0d6a7ce5600f5bf3a637ba1babd73",
+      "bytes": 51920,
+      "policy": "upstream snapshot; see docs/DEPENDENCIES.md"
+    },
+    {
+      "path": "apps/macos/Resources/Extractor/credential-retrieval/credential/core4-word-table.bin",
+      "sha256": "6f471504d53746e4f21cc52aabc1ea6ed1be9a130a0bfa7e348139cd8b68a912",
+      "bytes": 262144,
+      "policy": "upstream snapshot; see docs/DEPENDENCIES.md"
+    },
+    {
+      "path": "apps/macos/Resources/Extractor/credential-retrieval/credential/static-key-table.bin",
+      "sha256": "c7b33507f71d5f7a07f623eb21f6b9f23997f950119371631f6535f63e6d2af1",
+      "bytes": 4096,
+      "policy": "upstream snapshot; see docs/DEPENDENCIES.md"
+    },
+    {
+      "path": "apps/macos/Resources/NativeStoreRuntime/sap.wasm",
+      "sha256": "d5cedb84045079836df67f4708572068a4bd79ddc9b6fff46173d169ad8d43c9",
+      "bytes": 53890585,
+      "policy": "local-only pending redistribution review"
+    }
+  ]
+}

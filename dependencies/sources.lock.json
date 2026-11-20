@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "go_toolchain": "go1.26.5",
+  "sources": [
+    {
+      "name": "ipatool",
+      "path": "apps/macos/ThirdPartySource/ipatool",
+      "revision": "3e84853e2e5d60540a5022b64895d496910144eb",
+      "license": "MIT",
+      "tree_sha256": "7724dd58a746b35b2334947f44a838cfbcb0dcb33fac965dd8d544dff7f0693b",
+      "files": 344,
+      "excluded": [
+        "internal/store/profile/data_generated.go"
+      ]
+    },
+    {
+      "name": "AppleAuth",
+      "path": "apps/macos/ThirdPartySource/AppleAuth",
+      "revision": "98c862f7bebc8283a9b87f1578e703f0765dc81d",
+      "license": "MIT",
+      "tree_sha256": "84a93720fd34a83ff6a8e36653862d34d1b8db4ef1073a8cd1fcc47ea08473d3",
+      "files": 162,
+      "excluded": []
+    },
+    {
+      "name": "libzip",
+      "path": "apps/macos/ThirdPartySource/libzip",
+      "revision": "1.11.4",
+      "license": "BSD-3-Clause",
+      "tree_sha256": "3d1b7a3a626add72bf12465dc9fb7ec109bd33ebfa6729e8d5a74b125f25a5b2",
+      "files": 916,
+      "excluded": []
+    },
+    {
+      "name": "nlohmann_json",
+      "path": "apps/macos/ThirdPartySource/nlohmann_json",
+      "revision": "55f93686c01528224f448c19128836e7df245f72",
+      "license": "MIT",
+      "tree_sha256": "b47813c941449d3f9772e7554d18ecf054aacba12cdf50f37be465a117110942",
+      "files": 3,
+      "excluded": []
+    },
+    {
+      "name": "lzfse",
+      "path": "apps/macos/ThirdPartySource/lzfse",
+      "revision": "e634ca58b4821d9f3d560cdc6df5dec02ffc93fd",
+      "license": "BSD-3-Clause",
+      "tree_sha256": "0e4dbd9358e313fb3e3bb6e90c38e471ff06f1f5953ce4b9ef01e72d21217590",
+      "files": 24,
+      "excluded": []
+    },
+    {
+      "name": "ZIPFoundation-ios",
+      "path": "apps/ios/Vendor/ZIPFoundation",
+      "revision": "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
+      "license": "MIT",
+      "tree_sha256": "2bf55335adde10379c7a5f0abc2113b69be8dc525ae23de68f2c6e8d25a3393c",
+      "files": 26,
+      "excluded": []
+    },
+    {
+      "name": "ZIPFoundation-macos",
+      "path": "apps/macos/Vendor/ZIPFoundation",
+      "revision": "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
+      "license": "MIT",
+      "tree_sha256": "2bf55335adde10379c7a5f0abc2113b69be8dc525ae23de68f2c6e8d25a3393c",
+      "files": 26,
+      "excluded": []
+    },
+    {
+      "name": "fairplay-decrypt",
+      "path": "apps/macos/Resources/Extractor/credential-retrieval",
+      "revision": "d81d98b13656c9dbb340f04dd0838137278f44a5",
+      "license": "GPL-3.0-only",
+      "tree_sha256": "90566dd5efeb27b7aa91ee7a4d9fd0466b9e86af608098fb45f70799e85b1c68",
+      "files": 37,
+      "excluded": [
+        "build"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "apps/macos/ThirdPartySource/mbedtls-3.6.5.tar.bz2",
+      "sha256": "4a11f1777bb95bf4ad96721cac945a26e04bf19f57d905f241fe77ebeddf46d8"
+    },
+    {
+      "path": "apps/ios/Tools/ipatool/unicorn/unicorn-2.1.4.tgz",
+      "sha256": "ea8863f095a0136388694e5a6063afd9bb7650e30243dd6251af59c5ce5601f4"
+    },
+    {
+      "path": "apps/ios/Tools/ipatool/unicorn/unicorn-ios.patch",
+      "sha256": "6f5d18f0cf922016b49ac35a292a605af2ae42a0a053c9a9fe32b4999590b08e"
+    },
+    {
+      "path": "apps/macos/ThirdPartySource/ipatool/go.mod",
+      "sha256": "20584cd6d64ab2628ea318b64fe08a46adebb6eb13458701bb963b894bda5c81"
+    },
+    {
+      "path": "apps/macos/ThirdPartySource/ipatool/go.sum",
+      "sha256": "30f2b52de5f2a0a111bb1d0a0620e3e0801fbcb087dba966424a12cdd7ac49a3"
+    },
+    {
+      "path": "apps/ios/Tools/apple-auth-login.patch",
+      "sha256": "6f268c5c5a6232ee67da3bcbf81928bedab0f1263915f88b7692bb7971a62315"
+    },
+    {
+      "path": "apps/ios/Tools/ipatool/transfer.patch",
+      "sha256": "8e8238db45f70699ccec62ae959f14e51ae43688102d3fe8ddce15f3ff7710ab"
+    }
+  ]
+}

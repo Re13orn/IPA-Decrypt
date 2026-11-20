@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "scope": "Pinned build-host runtime bytes; bootstrap from source still required on a new machine",
+  "components": [
+    {
+      "name": "libusbmuxd",
+      "version": "2.1.1",
+      "source_url": "https://github.com/libimobiledevice/libusbmuxd/releases/download/2.1.1/libusbmuxd-2.1.1.tar.bz2",
+      "source_sha256": "5546f1aba1c3d1812c2b47d976312d00547d1044b84b6a461323c621f396efce",
+      "license_declaration": "all_of: [\"GPL-2.0-or-later\", \"LGPL-2.1-or-later\"]",
+      "formula_sha256": "b286274205537f34cc5ddfbb026a46f64f20a0c5b7130e7e9a1f0fb7879aaca1"
+    },
+    {
+      "name": "libplist",
+      "version": "2.7.0",
+      "source_url": "https://github.com/libimobiledevice/libplist/releases/download/2.7.0/libplist-2.7.0.tar.bz2",
+      "source_sha256": "7ac42301e896b1ebe3c654634780c82baa7cb70df8554e683ff89f7c2643eb8b",
+      "license_declaration": "\"LGPL-2.1-or-later\"",
+      "formula_sha256": "635a0b7ebf0c25753f1abbbc28c4267d4dddfd116aa758b84581184ff3347597"
+    },
+    {
+      "name": "libimobiledevice-glue",
+      "version": "1.3.2",
+      "source_url": "https://github.com/libimobiledevice/libimobiledevice-glue/releases/download/1.3.2/libimobiledevice-glue-1.3.2.tar.bz2",
+      "source_sha256": "6489a3411b874ecd81c87815d863603f518b264a976319725e0ed59935546774",
+      "license_declaration": "\"LGPL-2.1-or-later\"",
+      "formula_sha256": "6fc7302ee5d4f470dfea435eda5d769de6a6a9455b492a9cc45efab860bba5ad"
+    },
+    {
+      "name": "libimobiledevice",
+      "version": "1.4.0",
+      "source_url": "https://github.com/libimobiledevice/libimobiledevice/releases/download/1.4.0/libimobiledevice-1.4.0.tar.bz2",
+      "source_sha256": "23cc0077e221c7d991bd0eb02150a0d49199bcca1ddf059edccee9ffd914939d",
+      "license_declaration": "\"LGPL-2.1-or-later\"",
+      "formula_sha256": "a47281a65e13f9aa4bfeafb48f212ab4bac817ac4daffb169fe6f3cc724c68b2"
+    },
+    {
+      "name": "openssl@3",
+      "version": "3.6.3",
+      "source_url": "https://github.com/openssl/openssl/releases/download/openssl-3.6.3/openssl-3.6.3.tar.gz",
+      "source_sha256": "243a86649cf6f23eeb6a2ff2456e09e5d77dd9018a54d3d96b0c6bdd6ba6c7f1",
+      "license_declaration": "\"Apache-2.0\"",
+      "formula_sha256": "204067e3af016bba4246c64454f8a1a8d56916dd2f6d021b7bf5dcd13166374b"
+    }
+  ],
+  "binaries": [
+    {
+      "component": "libusbmuxd",
+      "version": "2.1.1",
+      "member": "bin/iproxy",
+      "sha256": "ef91b0b2cd8964be4216aa4b5b859955f015337d95a1202d16b75489e4f9d230"
+    },
+    {
+      "component": "libplist",
+      "version": "2.7.0",
+      "member": "lib/libplist-2.0.4.dylib",
+      "sha256": "9e833f3fddc6413a7645d5cc42bff19d6e66330386d0b4ab6ffb41b4fd8c5101"
+    },
+    {
+      "component": "libimobiledevice-glue",
+      "version": "1.3.2",
+      "member": "lib/libimobiledevice-glue-1.0.0.dylib",
+      "sha256": "fda1c1db21248558f47d85529d38758f733316230186acc14d897181317acb3f"
+    },
+    {
+      "component": "libusbmuxd",
+      "version": "2.1.1",
+      "member": "lib/libusbmuxd-2.0.7.dylib",
+      "sha256": "d461027af9843c3a58f718b76ea1173f1a16200f1ecc453e6082ff268191d501"
+    },
+    {
+      "component": "libimobiledevice",
+      "version": "1.4.0",
+      "member": "bin/ideviceinfo",
+      "sha256": "23d4c5c3443e3716291b225e0825924a20df6492b0acfa778b33db660ba7282c"
+    },
+    {
+      "component": "openssl@3",
+      "version": "3.6.3",
+      "member": "lib/libcrypto.3.dylib",
+      "sha256": "a12805a18cd5e4f733fa8727b91afa08b587f9da5a760517cd79cb508a3a3f71"
+    },
+    {
+      "component": "openssl@3",
+      "version": "3.6.3",
+      "member": "lib/libssl.3.dylib",
+      "sha256": "ffd8ac6981000def0928367924b6cb1e7a98712efbc06e2a2f3f750138bd89ca"
+    },
+    {
+      "component": "libimobiledevice",
+      "version": "1.4.0",
+      "member": "lib/libimobiledevice-1.0.6.dylib",
+      "sha256": "344e23da4ed1bd3e8e60838d95585059a573e4ee24fcd5364f8ddbfc428e48da"
+    },
+    {
+      "component": "libimobiledevice",
+      "version": "1.4.0",
+      "member": "bin/idevice_id",
+      "sha256": "c92ca2658642568b49533eee9b88f92ec04812509397b51876446a08a35a5636"
+    }
+  ]
+}

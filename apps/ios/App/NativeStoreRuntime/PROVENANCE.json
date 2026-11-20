@@ -1,0 +1,15 @@
+{
+  "source": "https://github.com/ScriptingApp/Community-Scripts",
+  "commit": "cb67401c795775a10b7623a6d51b7b7479e45f22",
+  "archive": "TestFlight\u9b54\u6cd5\u653b\u51fb.scripting",
+  "purpose": "Experimental local Store AMD/SAP runtime; upstream binary is preserved, not rebuilt here.",
+  "sha256": {
+    "state-store.mjs": "24584d8d8119a1ca68bd8e7eefec48edb7701fea7a1d19200736d273a0fd7c83",
+    "sap.wasm": "d5cedb84045079836df67f4708572068a4bd79ddc9b6fff46173d169ad8d43c9",
+    "wasm_exec.js": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14",
+    "crypto-api.mjs": "07505667b4a107856a3755b07eaae63759f1210be5532cfbcb9a2852a5ef72ed",
+    "unicorn_x86.js": "e041d2f45fee7ce7d079b254d014d66606c1a5930afc78937d1b9862e856af69",
+    "amd-generator.mjs": "0101f5829d65ca9b8715067af3eadbe29f29c294bf465b6559d1b686966336ce",
+    "crypto-worker.js": "69cf6e75b85f3b3435ac79ffeecbea5bbd0e8cd7b1168094ed78bd1453dbc8d8"
+  }
+}

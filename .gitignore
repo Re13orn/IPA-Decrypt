@@ -1,0 +1,47 @@
+.DS_Store
+.build/
+.build-work/
+dist/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+*.log
+xcuserdata/
+*.xcuserstate
+DerivedData/
+# Signing and user data never belong in this repository.
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+PrivatePasswords/
+DeviceCaptures/
+accounts.json
+credentials.json
+credential.bin
+# Explicit synthetic fixtures, never replace them with a real key.
+!apps/*/Tools/Tests/Fixtures/credential.bin
+*.ipa
+!apps/*/Tools/Tests/Fixtures/*.ipa
+*.dmg
+*.app/
+# Generated native artifacts: rebuild from source.
+*.a
+*.dylib
+*.so
+*.xcframework/
+apps/macos/Resources/PythonPackages/
+apps/macos/Resources/Extractor/bundle/*.ios
+apps/macos/Resources/Extractor/credential-retrieval/build/
+# Unverified upstream runtime inputs are local only.
+**/NativeStoreRuntime/state-store.mjs
+**/NativeStoreRuntime/sap.wasm
+**/NativeStoreRuntime/crypto-api.mjs
+**/NativeStoreRuntime/unicorn_x86.js
+**/NativeStoreRuntime/amd-generator.mjs
+**/NativeStoreRuntime/crypto-worker.js
+apps/macos/ThirdPartySource/ipatool/internal/store/profile/data_generated.go

@@ -1,0 +1,705 @@
+diff --git a/include/apple_auth/client.hpp b/include/apple_auth/client.hpp
+index 02b2fe0..b8ad999 100644
+--- a/include/apple_auth/client.hpp
++++ b/include/apple_auth/client.hpp
+@@ -40,6 +40,8 @@ enum class VerificationMethod {
+ struct TrustedPhoneNumber {
+     std::int64_t id;
+     std::string display_number;
++    int sms_delivery_status = 0;
++    bool allows_trusted_device = false;
+ };
+ 
+ struct VerificationOptions {
+@@ -47,6 +49,7 @@ struct VerificationOptions {
+     VerificationMethod method = VerificationMethod::automatic;
+     std::int64_t phone_number_id = 0;
+     std::function<std::int64_t(const std::vector<TrustedPhoneNumber>&)> select_phone;
++    bool recover_sms_delivery = false;
+ };
+ 
+ // Device identity platform, independent of the host OS.
+diff --git a/include/apple_auth/client_c_api.h b/include/apple_auth/client_c_api.h
+index 7f4ae4e..6db979b 100644
+--- a/include/apple_auth/client_c_api.h
++++ b/include/apple_auth/client_c_api.h
+@@ -108,7 +108,9 @@ typedef enum aauth_verification_method {
+     AAUTH_VERIFY_SMS = 2
+ } aauth_verification_method;
+ 
+-// phones_json is an array of {id, display_number}; return a listed ID, or cancel with nonzero.
++// phones_json is an array of {id, display_number}, with optional SMS failure metadata.
++// Return a listed ID, or zero if allows_trusted_device permits switching methods.
++// Return nonzero from the callback to cancel.
+ typedef int (*aauth_phone_selection_callback)(void* context,
+                                               const char* phones_json,
+                                               int64_t* selected);
+@@ -119,6 +121,7 @@ typedef struct aauth_verification_options {
+     aauth_two_factor_callback code;
+     aauth_phone_selection_callback select_phone;
+     void* context;
++    int32_t recover_sms_delivery;
+ } aauth_verification_options;
+ 
+ // Paths and strings use UTF-8. Serialize calls on each client instance.
+diff --git a/src/api/client_api.cpp b/src/api/client_api.cpp
+index 03b0aaa..5c36980 100644
+--- a/src/api/client_api.cpp
++++ b/src/api/client_api.cpp
+@@ -398,12 +398,17 @@ aauth_status aauth_client_login(aauth_client* client,
+             verification.method = static_cast<VerificationMethod>(options.method);
+             verification.phone_number_id = options.phone_number_id;
+             verification.code = make_two_factor(options.code, options.context);
++            verification.recover_sms_delivery = options.recover_sms_delivery != 0;
+             if (options.select_phone) {
+                 verification.select_phone = [options](const auto& phones) {
+                     netdetail::Json choices = netdetail::Json::array();
+                     for (const auto& phone : phones) {
+-                        choices.push_back(
+-                            {{"id", phone.id}, {"display_number", phone.display_number}});
++                        netdetail::Json choice{{"id", phone.id}, {"display_number", phone.display_number}};
++                        if (phone.sms_delivery_status != 0) {
++                            choice["sms_delivery_status"] = phone.sms_delivery_status;
++                            choice["allows_trusted_device"] = phone.allows_trusted_device;
++                        }
++                        choices.push_back(std::move(choice));
+                     }
+                     const auto json = choices.dump();
+                     std::int64_t selected = 0;
+diff --git a/src/client/apple_plist.cpp b/src/client/apple_plist.cpp
+index 2888d7b..2858e77 100644
+--- a/src/client/apple_plist.cpp
++++ b/src/client/apple_plist.cpp
+@@ -61,7 +61,10 @@ Json decode(CFTypeRef value, unsigned depth) {
+         const auto count = CFDataGetLength(data);
+         return Json::binary(count ? Bytes(CFDataGetBytePtr(data), CFDataGetBytePtr(data) + count) : Bytes{});
+     }
+-    if (type == CFBooleanGetTypeID()) return CFBooleanGetValue(static_cast<CFBooleanRef>(value));
++    if (type == CFBooleanGetTypeID()) {
++        // CoreFoundation Boolean is an integer type. JSON must retain the plist boolean.
++        return CFBooleanGetValue(static_cast<CFBooleanRef>(value)) != 0;
++    }
+     if (type == CFNumberGetTypeID()) {
+         const auto number = static_cast<CFNumberRef>(value);
+         if (CFNumberIsFloatType(number)) {
+diff --git a/src/client/authentication.cpp b/src/client/authentication.cpp
+index 85cd944..52047e6 100644
+--- a/src/client/authentication.cpp
++++ b/src/client/authentication.cpp
+@@ -1,4 +1,5 @@
+ #include "client/client_internal.hpp"
++#include "client/sms_challenge.hpp"
+ #include "crypto/backend.hpp"
+ #include <algorithm>
+ #include <cctype>
+@@ -179,20 +180,22 @@ Json grandslam_login(const std::string& email,
+         lookup_grandslam_urls(authentication_headers(fresh_headers, clock()), transport);
+     const auto service_url = grandslam_url(urls, "gsService");
+     for (unsigned attempt = 0; attempt < 2; ++attempt) {
+-        Headers headers;
+-        auto post = [&](Json fields) {
+-            headers = authentication_headers(fresh_headers, clock());
+-            fields["cpd"] = client_data(headers);
++        // Both SRP messages belong to one challenge and use the same anisette
++        // proof and client time. A new OTP is needed for the next exchange,
++        // not between initialization and submission of the password proof.
++        const auto headers = authentication_headers(fresh_headers, clock());
++        const auto cpd = client_data(headers);
++        auto post = [&](Json fields, const std::string& stage) {
++            fields["cpd"] = cpd;
+             auto body = encode_plist(Json{{"Header", {{"Version", "1.0.1"}}}, {"Request", fields}});
+             auto response = http(service_url, body, headers);
+             require(response.status == 200, "GrandSlam HTTP " + std::to_string(response.status));
+-            const auto operation = fields.value("o", std::string("request"));
+ 
+             Json top;
+             try {
+                 top = parse_plist(response.body);
+             } catch (const Error& error) {
+-                throw Error("GrandSlam " + operation + " response: " + error.what());
++                throw Error("GrandSlam " + stage + " response: " + error.what());
+             }
+             require(top.contains("Response") && top["Response"].is_object(),
+                     "Malformed GrandSlam response");
+@@ -200,7 +203,7 @@ Json grandslam_login(const std::string& email,
+             try {
+                 status(result);
+             } catch (const Error& error) {
+-                throw Error("GrandSlam " + fields.value("o", std::string("request")) + ": " +
++                throw Error("GrandSlam " + stage + ": " +
+                             error.what());
+             }
+             return result;
+@@ -209,21 +212,23 @@ Json grandslam_login(const std::string& email,
+         auto initial = post({{"A2k", Json::binary(srp.public_key())},
+                              {"o", "init"},
+                              {"ps", {"s2k", "s2k_fo"}},
+-                             {"u", email}});
++                             {"u", email}}, "init");
+         require(initial.contains("i") && initial["i"].is_number_integer(),
+                 "Missing SRP iteration count");
+         auto iterations = initial["i"].get<std::int64_t>();
+         require(iterations > 0 && iterations <= 1000000, "Invalid SRP iteration count");
++        const auto scheme = text(initial, "sp");
++        require(scheme == "s2k" || scheme == "s2k_fo", "Unsupported GrandSlam password proof scheme");
+         auto proof = srp.complete(email,
+                                   password,
+                                   binary(initial, "s"),
+                                   binary(initial, "B"),
+                                   int(iterations),
+-                                  text(initial, "sp"));
++                                  scheme);
+         auto complete = post({{"M1", Json::binary(proof.m1)},
+                               {"c", text(initial, "c")},
+                               {"o", "complete"},
+-                              {"u", email}});
++                              {"u", email}}, "complete (" + scheme + ")");
+         proof.verify(binary(complete, "M2"));
+         auto key = hmac_sha256(proof.key, bytes("extra data key:")),
+              iv = hmac_sha256(proof.key, bytes("extra data iv:"));
+@@ -257,98 +262,84 @@ Json grandslam_login(const std::string& email,
+                 "Apple requires SMS verification; choose SMS or automatic verification");
+         if (use_sms) {
+             const auto secondary_url = grandslam_url(urls, "secondaryAuth");
+-            auto sms_headers = trusted_device_headers(
+-                authentication_headers(fresh_headers, clock()), identity_token);
+-            sms_headers["Content-Type"] = "application/json";
+-            sms_headers["Accept"] = "application/json";
++            const auto make_sms_headers = [&] {
++                auto result = trusted_device_headers(
++                    authentication_headers(fresh_headers, clock()), identity_token);
++                result["Content-Type"] = "application/json";
++                result["Accept"] = "application/json";
++                return result;
++            };
+             std::int64_t phone_id = verification ? verification->phone_number_id : 0;
+-            bool already_sent = false;
++            std::int64_t already_sent_to = 0;
++            std::vector<TrustedPhoneNumber> choices;
+             if (phone_id <= 0) {
+-                const auto configuration = http(secondary_url, {}, sms_headers, "GET");
+-                require(configuration.status == 200 || configuration.status == 201,
+-                        "Cannot read SMS verification configuration (HTTP " +
+-                            std::to_string(configuration.status) + ")");
+-                const auto data = Json::parse(configuration.body);
+-                const auto& container = data.contains("phoneNumberVerification")
+-                                            ? data.at("phoneNumberVerification")
+-                                            : data;
+-                const auto& phones = container.at("trustedPhoneNumbers");
+-                require(phones.is_array() && !phones.empty() && phones.size() <= 32,
+-                        "No trusted SMS phone numbers are available");
+-                std::vector<TrustedPhoneNumber> choices;
+-                for (const auto& phone : phones) {
+-                    const auto id = phone.at("id").get<std::int64_t>();
+-                    require(id > 0, "Invalid trusted phone identifier");
+-                    choices.push_back({id, phone.value("numberWithDialCode", std::string())});
++                const auto configuration = http(secondary_url, {}, make_sms_headers(), "GET");
++                auto challenge = ipalab::parse_sms_challenge(configuration.status, configuration.body);
++                already_sent_to = challenge.already_sent_to;
++                for (auto& phone : challenge.phones) {
++                    choices.push_back({phone.id, std::move(phone.display)});
+                 }
+                 if (verification && verification->select_phone) {
+                     phone_id = verification->select_phone(choices);
+                 } else {
+-                    require(
+-                        choices.size() == 1,
+-                        "Multiple SMS numbers are available; provide a phone-selection callback");
++                    require(choices.size() == 1,
++                            "Multiple SMS numbers are available; provide a phone-selection callback");
+                     phone_id = choices.front().id;
+                 }
+-                require(std::any_of(choices.begin(),
+-                                    choices.end(),
+-                                    [&](const auto& phone) {
+-                                        return phone.id == phone_id;
+-                                    }),
++                require(ipalab::contains_phone(choices, phone_id),
+                         "SMS phone selection was canceled or is invalid");
+-                already_sent = configuration.status == 201 && phone_id == choices.front().id;
+-            }
+-            if (!already_sent) {
+-                const auto payload =
+-                    bytes(Json{{"phoneNumber", {{"id", phone_id}}}, {"mode", "sms"}}.dump());
+-                const auto delivery =
+-                    http(secondary_url + "/verify/phone", payload, sms_headers, "PUT");
+-                require(delivery.status == 200 || delivery.status == 201,
+-                        "Cannot request SMS verification (HTTP " + std::to_string(delivery.status) +
+-                            ")");
+             }
+-            auto code = two_factor();
+-            code.erase(std::remove_if(code.begin(),
+-                                      code.end(),
+-                                      [](unsigned char byte) {
+-                                          return std::isspace(byte);
+-                                      }),
+-                       code.end());
++            phone_id = ipalab::deliver_sms(
++                choices, phone_id, already_sent_to, account_state != AccountState::requires_sms,
++                verification && verification->recover_sms_delivery
++                    ? verification->select_phone : decltype(VerificationOptions::select_phone){},
++                [&](std::int64_t destination) {
++                    const auto payload =
++                        bytes(Json{{"phoneNumber", {{"id", destination}}}, {"mode", "sms"}}.dump());
++                    return http(secondary_url + "/verify/phone", payload, make_sms_headers(), "PUT").status;
++                });
++            if (phone_id != 0) {
++                auto code = two_factor();
++                code.erase(std::remove_if(code.begin(),
++                                          code.end(),
++                                          [](unsigned char byte) {
++                                              return std::isspace(byte);
++                                          }),
++                           code.end());
+ 
+-            struct WipeCode {
+-                std::string& value;
++                struct WipeCode {
++                    std::string& value;
+ 
+-                ~WipeCode() {
+-                    crypto::wipe(value.data(), value.size());
+-                }
+-            } wipe{code};
++                    ~WipeCode() {
++                        crypto::wipe(value.data(), value.size());
++                    }
++                } wipe{code};
+ 
+-            require(code.size() == 6 && code.find_first_not_of("0123456789") == std::string::npos,
+-                    "2FA must contain six digits");
+-            const auto payload = bytes(Json{{"phoneNumber", {{"id", phone_id}}},
+-                                            {"mode", "sms"},
+-                                            {"securityCode", {{"code", code}}}}
+-                                           .dump());
+-            sms_headers = trusted_device_headers(authentication_headers(fresh_headers, clock()),
+-                                                 identity_token);
+-            sms_headers["Content-Type"] = "application/json";
+-            sms_headers["Accept"] = "application/json";
+-            const auto verified =
+-                http(secondary_url + "/verify/phone/securitycode", payload, sms_headers);
+-            const auto confirmed = std::any_of(
+-                verified.headers.begin(), verified.headers.end(), [](const auto& field) {
+-                    auto name = field.first;
+-                    std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+-                        return char(std::tolower(c));
++                require(code.size() == 6 && code.find_first_not_of("0123456789") == std::string::npos,
++                        "2FA must contain six digits");
++                const auto payload = bytes(Json{{"phoneNumber", {{"id", phone_id}}},
++                                                {"mode", "sms"},
++                                                {"securityCode", {{"code", code}}}}
++                                               .dump());
++                const auto verified =
++                    http(secondary_url + "/verify/phone/securitycode", payload, make_sms_headers());
++                const auto confirmed = std::any_of(
++                    verified.headers.begin(), verified.headers.end(), [](const auto& field) {
++                        auto name = field.first;
++                        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
++                            return char(std::tolower(c));
++                        });
++                        return name == "x-apple-pe-token" && !field.second.empty();
+                     });
+-                    return name == "x-apple-pe-token" && !field.second.empty();
+-                });
+-            require(verified.status == 200 && confirmed,
+-                    "Apple did not confirm the SMS code (HTTP " +
+-                        std::to_string(verified.status) + ")");
+-            continue;
++                require(verified.status == 200 && confirmed,
++                        "Apple did not confirm the SMS code (HTTP " +
++                            std::to_string(verified.status) + ")");
++                continue;
++            }
+         }
+         if (!trusted_device_code_already_sent(complete, session)) {
+-            const auto trusted = trusted_device_headers(headers, identity_token);
++            const auto trusted = trusted_device_headers(
++                authentication_headers(fresh_headers, clock()), identity_token);
+             const auto trigger =
+                 http(grandslam_url(urls, "trustedDeviceSecondaryAuth"), {}, trusted, "GET");
+             require(trigger.status == 200, "Could not request trusted-device verification");
+diff --git a/src/client/client.cpp b/src/client/client.cpp
+index 0487dca..5263fd0 100644
+--- a/src/client/client.cpp
++++ b/src/client/client.cpp
+@@ -246,7 +246,14 @@ struct Client::Impl {
+                            "Use an explicit Configurator StoreClient");
+         auto& selected = protocol == StoreProtocol::macos_accounts ? mac_store : store;
+         if (!selected) {
+-            selected.reset(new StoreClient(storage.child("store"), protocol, options));
++            auto store_options = options;
++            if (protocol == StoreProtocol::macos_accounts) {
++                // The GrandSlam profile's user agent and client info are
++                // device-proof parameters, not the Store's TestFlight identity.
++                store_options.user_agent.clear();
++                store_options.client_info.clear();
++            }
++            selected.reset(new StoreClient(storage.child("store"), protocol, std::move(store_options)));
+         }
+         return *selected;
+     }
+diff --git a/src/client/store.cpp b/src/client/store.cpp
+index 1995b03..76426ab 100644
+--- a/src/client/store.cpp
++++ b/src/client/store.cpp
+@@ -695,7 +695,13 @@ StoreSession StoreClient::login_with_pet(const std::string& email,
+     require(impl_->protocol == StoreProtocol::macos_accounts && !email.empty() &&
+                 bool(device_headers),
+             "Mac Store login requires email, PET and fresh Mac device headers");
+-    const auto authenticated = parse_plist(account.plist);
++    auto stage = [](const char* label, auto&& run) {
++        try { return run(); }
++        catch (const std::exception& failure) {
++            throw netdetail::Error(std::string("Mac Store stage ") + label + ": " + failure.what());
++        }
++    };
++    const auto authenticated = stage("account-proof", [&] { return parse_plist(account.plist); });
+     require(authenticated.at("adsid") == account.account_id &&
+                 authenticated.at("t").at("com.apple.gs.idms.pet").at("token") == account.pet &&
+                 !account.pet.empty(),
+@@ -709,8 +715,8 @@ StoreSession StoreClient::login_with_pet(const std::string& email,
+         require(expiry / 1000 > impl_->options.clock() + 5, "Mac PET has expired");
+     };
+     valid_pet();
+-    impl_->provision();
+-    impl_->prepare_sap();
++    stage("device-registration", [&] { impl_->provision(); });
++    stage("sap-setup", [&] { impl_->prepare_sap(); });
+     auto url = impl_->bag.at("authenticateAccount").get<std::string>();
+     const Json payload{{"createSession", true},
+                        {"credentialSource", 5},
+@@ -726,7 +732,8 @@ StoreSession StoreClient::login_with_pet(const std::string& email,
+     for (unsigned redirects = 0; redirects <= 3; ++redirects) {
+         valid_pet();
+         auto headers = impl_->common();
+-        const auto fresh = device_headers(), store = impl_->headers();
++        const auto fresh = stage("account-proof-headers", device_headers);
++        const auto store = stage("store-proof-headers", [&] { return impl_->headers(); });
+         for (const auto* name : {"X-Apple-I-MD",
+                                  "X-Apple-I-MD-M",
+                                  "X-Apple-I-MD-RINFO",
+@@ -743,13 +750,13 @@ StoreSession StoreClient::login_with_pet(const std::string& email,
+         headers["X-DSID"] = dsid;
+         headers["X-Apple-Tz"] = "0";
+         headers["Accept"] = "*/*";
+-        headers["X-Apple-ActionSignature"] = base64(impl_->sap->sign(body));
++        headers["X-Apple-ActionSignature"] = stage("sap-sign", [&] { return base64(impl_->sap->sign(body)); });
+         const auto cookie = cookie_header(cookies, url, impl_->options.clock());
+         if (!cookie.empty()) {
+             headers["Cookie"] = cookie;
+         }
+         const auto response = impl_->options.transport({url, "POST", std::move(headers), body});
+-        cookies_update(cookies, url, response, impl_->options.clock());
++        stage("response-cookies", [&] { cookies_update(cookies, url, response, impl_->options.clock()); });
+         if (response.status == 302 || response.status == 307) {
+             auto next = header(response, "location");
+             require(redirects < 3 && !next.empty(), "Invalid Mac Store redirect");
+@@ -765,10 +772,20 @@ StoreSession StoreClient::login_with_pet(const std::string& email,
+                                     "Mac Store authentication HTTP " +
+                                         std::to_string(response.status));
+         }
+-        const auto result = decode_store(response.body);
+-        require(result.value("status", Json()) == 0 && result.contains("dsPersonId") &&
+-                    scalar(result.at("dsPersonId")) == dsid && result.contains("passwordToken"),
+-                "Mac Store authentication rejected");
++        Json result;
++        try { result = decode_store(response.body); }
++        catch (const std::exception&) { throw netdetail::Error("Mac Store response format invalid"); }
++        require(result.is_object(), "Mac Store response format invalid");
++        const auto status = result.find("status");
++        const auto failure = result.find("failureType");
++        require((status == result.end() || *status == 0 || *status == "0") &&
++                    (failure == result.end() || failure->is_null() || *failure == ""),
++                "Mac Store response rejected");
++        require(result.contains("dsPersonId"), "Mac Store response missing account ID");
++        require(scalar(result.at("dsPersonId")) == dsid, "Mac Store response account mismatch");
++        const auto token = result.find("passwordToken");
++        require(token != result.end() && token->is_string() && !token->get_ref<const std::string&>().empty(),
++                "Mac Store response missing session token");
+         auto storefront = header(response, "x-set-apple-store-front");
+         if (storefront.empty()) {
+             storefront = header(response, "x-apple-store-front");
+@@ -776,16 +793,21 @@ StoreSession StoreClient::login_with_pet(const std::string& email,
+         if (storefront.empty()) {
+             storefront = impl_->default_storefront();
+         }
+-        return StoreSession::from_plist(
+-            encode_plist({{"kind", "apple-auth-store"},
+-                          {"version", 1},
+-                          {"protocol", protocol_name(impl_->protocol)},
+-                          {"guid", impl_->identity.at("guid")},
+-                          {"user_agent", impl_->common().at("User-Agent")},
+-                          {"machine_id", store.at("X-Apple-AMD-M")},
+-                          {"storefront", storefront},
+-                          {"cookies", cookies},
+-                          {"account", result}}));
++        // The response can be JSON, with null values in fields the session never uses.
++        // Persist only the validated account fields that the Store session reads.
++        const Json session_account{{"dsPersonId", dsid}, {"passwordToken", *token}};
++        const auto serialized = stage("session-encode", [&] {
++            return encode_plist({{"kind", "apple-auth-store"},
++                                 {"version", 1},
++                                 {"protocol", protocol_name(impl_->protocol)},
++                                 {"guid", impl_->identity.at("guid")},
++                                 {"user_agent", impl_->common().at("User-Agent")},
++                                 {"machine_id", store.at("X-Apple-AMD-M")},
++                                 {"storefront", storefront},
++                                 {"cookies", cookies},
++                                 {"account", session_account}});
++        });
++        return stage("session-validation", [&] { return StoreSession::from_plist(serialized); });
+     }
+     throw netdetail::Error("Mac Store redirect limit exceeded");
+ }
+diff --git a/src/testflight/protocol.cpp b/src/testflight/protocol.cpp
+index 30f6d76..1141eba 100644
+--- a/src/testflight/protocol.cpp
++++ b/src/testflight/protocol.cpp
+@@ -6,6 +6,7 @@
+ #include <chrono>
+ #include <ctime>
+ #include <iomanip>
++#include <functional>
+ #include <sstream>
+ 
+ namespace apple_auth::tfdetail {
+@@ -25,6 +26,40 @@ std::string text(const Json& object, const char* key) {
+     return {};
+ }
+ 
++std::string exchange_error_code(ByteView body) {
++    if (body.empty() || body.size() > 16 * 1024) {
++        return {};
++    }
++    const auto response = Json::parse(body.begin(), body.end(), nullptr, false);
++    if (!response.is_object()) {
++        return {};
++    }
++    const auto numeric = [](const std::string& code) {
++        const auto start = code.starts_with('-') ? 1u : 0u;
++        return code.size() > start && code.size() - start <= 7 &&
++               code.find_first_not_of("0123456789", start) == std::string::npos;
++    };
++    auto code = text(response, "errorCode");
++    if (numeric(code)) {
++        return " Apple error " + code;
++    }
++    if (response.contains("error")) {
++        code = text(response.at("error"), "code");
++        if (numeric(code)) {
++            return " Apple error " + code;
++        }
++    }
++    if (response.contains("messages") && response.at("messages").is_array()) {
++        for (const auto& message : response.at("messages")) {
++            code = text(message, "code");
++            if (text(message, "messageType") == "ERROR" && numeric(code)) {
++                return " Apple error " + code;
++            }
++        }
++    }
++    return {};
++}
++
+ std::string escape(const std::string& value) {
+     const char* digits = "0123456789ABCDEF";
+     std::string result;
+@@ -43,8 +78,7 @@ std::string escape(const std::string& value) {
+     return result;
+ }
+ 
+-std::string request_id() {
+-    auto id = random_bytes(16);
++std::string uuid_string(Bytes id) {
+     id[6] = (id[6] & 15) | 0x40;
+     id[8] = (id[8] & 63) | 0x80;
+     auto encoded = hex(id);
+@@ -55,6 +89,10 @@ std::string request_id() {
+            encoded.substr(16, 4) + "-" + encoded.substr(20);
+ }
+ 
++std::string request_id() {
++    return uuid_string(random_bytes(16));
++}
++
+ void visit(const Json& value,
+            const std::function<void(const Json&)>& callback,
+            unsigned depth = 0) {
+@@ -142,14 +180,16 @@ Json create_session(const Json& context,
+                             "X-Apple-Rosetta-Available"}) {
+         headers[key] = text(context.at("headers"), key);
+     }
++    const auto& ios_compatible = headers.at("X-Apple-TestFlight-iOS");
+     require(!headers["User-Agent"].empty() && !headers["X-Apple-AMD-M"].empty() &&
+-                !headers["X-Apple-Store-Front"].empty() && headers["X-Apple-TestFlight-iOS"] == "0",
++                !headers["X-Apple-Store-Front"].empty() &&
++                (ios_compatible == "0" || ios_compatible == "1"),
+             "Incomplete macOS TestFlight context");
+     headers["Accept"] = "application/json";
+     headers["Content-Type"] = "application/json";
+     headers["Accept-Language"] = "en-US";
+     merge_headers(headers, options.headers);
+-    const auto vendor = request_id();
++    const auto vendor = uuid_string(Bytes(hardware.begin(), hardware.begin() + 16));
+     const auto storefront = headers["X-Apple-Store-Front"];
+     const Json body{{"deviceModel", headers["X-Apple-Device-Model"]},
+                     {"deviceName",
+@@ -157,20 +197,25 @@ Json create_session(const Json& context,
+                                                  : options.device_name},
+                     {"dsId", number},
+                     {"deviceVendorId", vendor},
+-                    {"storeFrontIdentifier", storefront.substr(0, storefront.find(','))},
++                    {"storeFrontIdentifier", storefront},
+                     {"storeCookies", context.at("storeCookies")}};
+     const auto response = transport({"https://testflight.apple.com/v1/session/authenticate",
+                                      "POST",
+                                      headers,
+                                      bytes(body.dump())});
+-    require(response.status >= 200 && response.status < 300,
+-            "TestFlight session creation rejected (HTTP " + std::to_string(response.status) + ")");
+-    auto payload = Json::parse(response.body.begin(), response.body.end());
+-    if (payload.is_object() && payload.contains("data")) {
+-        payload = payload.at("data");
++    if (response.status < 200 || response.status >= 300) {
++        throw netdetail::Error(
++            "TestFlight session creation rejected (HTTP " + std::to_string(response.status) + ")" +
++            exchange_error_code(response.body));
+     }
+-    const auto account = text(payload, "accountId"), session = text(payload, "sessionId");
+-    require(!account.empty() && !session.empty(), "TestFlight did not return a session");
++    const auto payload = Json::parse(response.body.begin(), response.body.end(), nullptr, false);
++    const auto http_status = " (HTTP " + std::to_string(response.status) + ")";
++    require(payload.is_object(), "TestFlight session response format invalid" + http_status);
++    const auto& fields = payload.contains("data") ? payload.at("data") : payload;
++    const auto account = text(fields, "accountId"), session = text(fields, "sessionId");
++    require(!account.empty() && !session.empty(),
++            "TestFlight session response missing credentials" + http_status +
++                exchange_error_code(response.body));
+     return Json{
+         {"accountId", account},
+         {"sessionId", session},
+@@ -278,29 +323,60 @@ Json Engine::request(unsigned version, const std::string& resource, const Json*
+ }
+ 
+ Json Engine::catalog() {
+-    return request(4, "apps?allDetailsCount=10000");
++    auto index = request(4, "apps?allDetailsCount=10000");
++    std::map<std::string, Json> outlines;
++    visit(index, [&](const Json& item) {
++        const auto id = text(item, "appId");
++        if (!id.empty()) outlines.try_emplace(id, item.at("appId"));
++    });
++    if (outlines.empty()) return index;
++
++    // v4 /apps is an index; bundle IDs and platform builds are supplied by
++    // appDetails. Keep both responses, including expired/invited outlines.
++    Json details = Json::array(), batch = Json::array();
++    const auto flush = [&] {
++        if (batch.empty()) return;
++        const Json body{{"apps", batch}};
++        const auto response = request(4, "appDetails", &body);
++        require(response.is_array(),
++                "TestFlight app details response format invalid");
++        for (const auto& item : response) details.push_back(item);
++        batch.clear();
++    };
++    for (const auto& [id, value] : outlines) {
++        batch.push_back(Json{{"appId", value}});
++        if (batch.size() == 25) flush();
++    }
++    flush();
++    require(!details.empty(), "TestFlight index contains apps but app details are empty");
++    if (!index.is_object()) index = Json{{"data", index}};
++    index["resolvedAppDetails"] = std::move(details);
++    return index;
+ }
+ 
+ std::string Engine::find_app(const std::string& bundle) {
+     auto data = catalog();
+     std::string result;
+-    const auto match = [&](const Json& app) {
+-        auto name = text(app, "bundleId");
+-        if (name.empty()) {
+-            name = text(app, "bundleIdentifier");
+-        }
+-        if (name != bundle) {
++    std::function<void(const Json&, std::string)> matchTree;
++    matchTree = [&](const Json& app, std::string inherited) {
++        if (app.is_array()) {
++            for (const auto& item : app) matchTree(item, inherited);
+             return;
+         }
++        if (!app.is_object()) return;
+         for (const auto* key : {"appAdamId", "adamId", "appId"}) {
+-            auto candidate = text(app, key);
+-            if (!candidate.empty()) {
+-                result = candidate;
+-                break;
+-            }
++            const auto candidate = text(app, key);
++            if (!candidate.empty()) { inherited = candidate; break; }
++        }
++        auto name = text(app, "bundleId");
++        if (name.empty()) {
++            name = text(app, "bundleIdentifier");
+         }
++        if (name == bundle && !inherited.empty()) result = inherited;
++        for (const auto& value : app) matchTree(value, inherited);
+     };
+-    visit(data, match);
++    const auto match = [&](const Json& item) { matchTree(item, {}); };
++    matchTree(data, {});
+     if (!result.empty()) {
+         return result;
+     }
+diff --git a/swift/AppleAuth/Sources/AppleAuth/Device.swift b/swift/AppleAuth/Sources/AppleAuth/Device.swift
+index 7cf974f..f1b2f3c 100644
+--- a/swift/AppleAuth/Sources/AppleAuth/Device.swift
++++ b/swift/AppleAuth/Sources/AppleAuth/Device.swift
+@@ -171,7 +171,8 @@ public final class Device: @unchecked Sendable {
+                 phone_number_id: verification?.phoneNumberID ?? 0,
+                 code: verification == nil ? nil : codeCallback,
+                 select_phone: verification?.selectPhone == nil ? nil : phoneCallback,
+-                context: Unmanaged.passUnretained(self.bridge).toOpaque())
++                context: Unmanaged.passUnretained(self.bridge).toOpaque(),
++                recover_sms_delivery: verification?.recoverSMSDelivery == true ? 1 : 0)
+             var session: OpaquePointer?
+             try checkClient(aauth_client_login(self.handle, email, password, &options, &session))
+             guard let session else { throw AppleAuthError("Login returned no session") }
+diff --git a/swift/AppleAuth/Sources/AppleAuth/Models.swift b/swift/AppleAuth/Sources/AppleAuth/Models.swift
+index df108df..2a0a63d 100644
+--- a/swift/AppleAuth/Sources/AppleAuth/Models.swift
++++ b/swift/AppleAuth/Sources/AppleAuth/Models.swift
+@@ -7,21 +7,31 @@ public enum VerificationMethod: Int32, Sendable { case automatic, trustedDevice,
+ public struct TrustedPhoneNumber: Codable, Sendable, Equatable {
+     public let id: Int64
+     public let displayNumber: String
+-    enum CodingKeys: String, CodingKey { case id; case displayNumber = "display_number" }
++    public let smsDeliveryStatus: Int?
++    public let allowsTrustedDevice: Bool?
++    enum CodingKeys: String, CodingKey {
++        case id
++        case displayNumber = "display_number"
++        case smsDeliveryStatus = "sms_delivery_status"
++        case allowsTrustedDevice = "allows_trusted_device"
++    }
+ }
+ 
+ public struct Verification: Sendable {
+     public var method: VerificationMethod
+     public var phoneNumberID: Int64
+     public var selectPhone: (@Sendable ([TrustedPhoneNumber]) async throws -> Int64)?
++    public var recoverSMSDelivery: Bool
+     public var code: @Sendable () async throws -> String
+ 
+     public init(method: VerificationMethod = .automatic, phoneNumberID: Int64 = 0,
++                recoverSMSDelivery: Bool = false,
+                 selectPhone: (@Sendable ([TrustedPhoneNumber]) async throws -> Int64)? = nil,
+                 code: @escaping @Sendable () async throws -> String) {
+         self.method = method
+         self.phoneNumberID = phoneNumberID
+         self.selectPhone = selectPhone
++        self.recoverSMSDelivery = recoverSMSDelivery
+         self.code = code
+     }
+ }

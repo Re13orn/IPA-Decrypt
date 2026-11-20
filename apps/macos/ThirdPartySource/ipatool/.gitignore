@@ -1,0 +1,9 @@
+.DS_Store
+.AppleDouble
+.LSOverride
+.vscode/
+.idea/
+**/*_mock.go
+exp/
+# This vendored snapshot retains generated mocks needed by its source tests.
+!**/*_mock.go

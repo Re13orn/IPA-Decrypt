@@ -1,0 +1,37 @@
+{
+  "description": "Known synthetic fixtures only; never replace with user files",
+  "fixtures": [
+    {
+      "path": "apps/ios/Tools/Tests/Fixtures/credential.bin",
+      "sha256": "370e747a2b6a9d4049ced9af7cd3b47e3df5e44132498b873ed7b7d133f9f460"
+    },
+    {
+      "path": "apps/ios/Tools/Tests/Fixtures/encrypted.ipa",
+      "sha256": "5f74cffaa45d1a05825f536f64d93dc22d0b557c00a2c05f966a60188f6bd6d1"
+    },
+    {
+      "path": "apps/ios/Tools/Tests/Fixtures/expected.bin",
+      "sha256": "c8f5d0341d54d951a71b136e6e2afcb14d11ed8489a7ae126a8fee0df6ecf193"
+    },
+    {
+      "path": "apps/ios/Tools/Tests/Fixtures/target.ipa",
+      "sha256": "aa27bf57eaf8571ced3c56858cfa5a2c48269eb64771d86d57136d83f853ca0b"
+    },
+    {
+      "path": "apps/macos/Tools/Tests/Fixtures/credential.bin",
+      "sha256": "370e747a2b6a9d4049ced9af7cd3b47e3df5e44132498b873ed7b7d133f9f460"
+    },
+    {
+      "path": "apps/macos/Tools/Tests/Fixtures/encrypted.ipa",
+      "sha256": "5f74cffaa45d1a05825f536f64d93dc22d0b557c00a2c05f966a60188f6bd6d1"
+    },
+    {
+      "path": "apps/macos/Tools/Tests/Fixtures/expected.bin",
+      "sha256": "c8f5d0341d54d951a71b136e6e2afcb14d11ed8489a7ae126a8fee0df6ecf193"
+    },
+    {
+      "path": "apps/macos/Tools/Tests/Fixtures/target.ipa",
+      "sha256": "aa27bf57eaf8571ced3c56858cfa5a2c48269eb64771d86d57136d83f853ca0b"
+    }
+  ]
+}

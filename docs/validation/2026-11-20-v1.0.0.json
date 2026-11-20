@@ -1,0 +1,40 @@
+{
+  "version": "1.0.0",
+  "build": "1",
+  "ios_bundle_identifier": "local.ipalab.app",
+  "macos_bundle_identifier": "local.ipadecrypt.mac",
+  "ios_build": {
+    "exit_code": 0,
+    "seconds": 54.98
+  },
+  "macos_build": {
+    "exit_code": 0,
+    "seconds": 58.75,
+    "harness_fix": "Set working directory to copied source so outer sandbox can deny original workspace."
+  },
+  "macos_installation": {
+    "platform": "macos",
+    "version": "1.0.0",
+    "minimum_os": "26.0",
+    "runtime_hashes_verified": 7,
+    "mach_o_checked": 23,
+    "device_helpers_excluded_from_host_link_check": 4,
+    "result": "passed-structural-installation-check",
+    "scope": "Bundle resource/dependency checks, not independent hardware or account acceptance"
+  },
+  "native_dependencies": "Reused previously source-rebuilt native libraries after validating pinned source inputs; app executables rebuilt in new work directories.",
+  "physical_new_device_acceptance": "Not repeated; previously deferred.",
+  "maintenance": "Unified release starts at v1.0.0; preceding development series end-of-life.",
+  "artifacts": [
+    {
+      "name": "IPA-Decrypt-iOS-1.0.0-unsigned.ipa",
+      "sha256": "69ea5c030b71e20b59229a17586afa4997f4196b528d3d846f4e37db387d9671",
+      "bytes": 47506393
+    },
+    {
+      "name": "IPA-Decrypt-macOS-1.0.0-arm64.dmg",
+      "sha256": "dfd04a59f612b76fd566290142139cf7a5dc4be75f36a6854258601ea27bc365",
+      "bytes": 98436490
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+name: Source checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  offline-tests:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Synthetic tests and source checks
+        run: |
+          python3 scripts/verify-dependencies.py
+          python3 -m unittest discover -s tests -p test_release_inputs.py
+          python3 -m unittest discover -s tests -p test_installation_bundle.py
+          bash scripts/test.sh
+# Full app builds need native artifacts and licensed runtime provisioning first.
+# No signing secrets, real Apple login or device SSH credentials are used here.
