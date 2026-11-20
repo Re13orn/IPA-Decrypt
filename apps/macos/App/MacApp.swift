@@ -34,10 +34,10 @@ import UniformTypeIdentifiers
 }
 
 enum MacPage: String, CaseIterable, Identifiable {
-    case store = "App Store", beta = "TestFlight", history = "处理记录", credentials = "FairPlay 凭据", device = "越狱设备提取"
+    case store = "App Store", beta = "TestFlight", history = "处理记录", credentials = "FairPlay 凭据", enrollment = "本机凭据提取", device = "越狱设备提取"
     var id: String { rawValue }
     var icon: String {
-        switch self { case .store: return "square.stack"; case .beta: return "paperplane"; case .history: return "clock"; case .credentials: return "key"; case .device: return "iphone.and.arrow.forward" }
+        switch self { case .store: return "square.stack"; case .beta: return "paperplane"; case .history: return "clock"; case .credentials: return "key"; case .enrollment: return "desktopcomputer.and.arrow.down"; case .device: return "iphone.and.arrow.forward" }
     }
 }
 struct PendingStoreRequest {
@@ -76,7 +76,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     ForEach([MacPage.store, .beta, .history]) { item in Label(item.rawValue, systemImage: item.icon).tag(item) }
                 }
                 Section("账户与设备") {
-                    ForEach([MacPage.credentials, .device]) { item in Label(item.rawValue, systemImage: item.icon).tag(item) }
+                    ForEach([MacPage.credentials, .enrollment, .device]) { item in Label(item.rawValue, systemImage: item.icon).tag(item) }
                 }
                 Section {
                     Button("导入本地 IPA…", systemImage: "square.and.arrow.down") { importIPA() }.buttonStyle(.plain)
@@ -96,6 +96,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 case .beta: betaView
                 case .history: historyView
                 case .credentials: MacCredentials(model: model, incomingFile: $incomingCredential)
+                case .enrollment: MacEnrollmentView(model: model)
                 case .device: CredentialExtractionView(model: model)
                 }
             }.navigationTitle((page ?? .store).rawValue)
@@ -252,7 +253,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     }
     private var deviceBusy: Bool {
         guard let action = model.action else { return false }
-        return ["正在提取设备凭据", "正在测试设备连接", "正在扫描设备许可证", "正在提取所选许可证", "正在全部提取并去重"].contains(action)
+        return ["正在提取本机模型", "正在提取设备凭据", "正在测试设备连接", "正在扫描设备许可证", "正在提取所选许可证", "正在全部提取并去重"].contains(action)
     }
     private func continueDetailAction() {
         guard let action = detailAction else { return }

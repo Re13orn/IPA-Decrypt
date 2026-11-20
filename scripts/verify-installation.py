@@ -30,7 +30,7 @@ def inspect(app,platform):
   if path.is_symlink():require(path.resolve().is_relative_to(app),'Symlink escapes bundle: '+path.name)
  required=[]
  if platform=='macos':
-  required=['Python/bin/python3','Extractor/host.py','Extractor/license_plan.py','Extractor/askpass','bin/idevice_id','bin/ideviceinfo','bin/iproxy']
+  required=['Python/bin/python3','Extractor/host.py','Extractor/license_plan.py','Extractor/askpass','bin/idevice_id','bin/ideviceinfo','bin/iproxy','bin/unfairplay']
   required+=['Extractor/bundle/'+name for name in ['credential.ios','driver.ios','trigger.ios','arcade-capture.ios','static-key-table.bin','core4-word-table.bin']]
  for name in required:
   require((resources/name).is_file(),'Missing helper: '+name)

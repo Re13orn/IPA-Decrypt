@@ -16,7 +16,7 @@ def files():
                 raise ValueError(f'Symlinks forbidden in public source: {(base/directory).relative_to(ROOT)}')
         for name in sorted(names):
             p=base/name; rel=p.relative_to(ROOT)
-            if str(rel) in EXTERNAL: continue
+            if str(rel) in EXTERNAL or str(rel)=='apps/macos/Vendor/unfairplay': continue
             if p.is_symlink(): raise ValueError(f'Symlinks forbidden in public source: {rel}')
             if not p.is_file() or p.name=='.DS_Store': continue
             if p.suffix in {'.p12', '.pfx', '.pem', '.key', '.mobileprovision', '.provisionprofile'}:

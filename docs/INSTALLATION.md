@@ -5,7 +5,7 @@
 | 平台 | 系统要求 | 安装附件 |
 | --- | --- | --- |
 | iOS | iOS 16 及以上 | [IPA-Decrypt-iOS-1.0.0-unsigned.ipa](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.0/IPA-Decrypt-iOS-1.0.0-unsigned.ipa) |
-| macOS | Apple Silicon · macOS 15 及以上 | `IPA-Decrypt-macOS-1.0.1-arm64.dmg` |
+| macOS | Apple Silicon · macOS 15 及以上 | `IPA-Decrypt-macOS-1.0.2-arm64.dmg` |
 
 从 [Releases](https://github.com/Re13orn/IPA-Decrypt/releases) 下载附件与对应的 `SHA256SUMS`，在下载目录执行：
 
@@ -51,7 +51,19 @@ ZIP 格式候选包解压后采用相同的 App 安装步骤。
 
 FairPlay 凭据为 16 字节数据，对应 32 个十六进制字符。支持 `credential.bin` 文件或十六进制导入。账户标签用于组织记录，实际适用性由许可证校验确定。
 
-## Mac 设备提取
+## Mac 本机提取
+
+1. 在原生 Mac App Store 登录，安装并打开一个 iPhone 或 iPad App。
+2. 在「本机凭据提取」页选择验证应用；可设置 Apple ID 管理标签，也可保持未绑定。
+3. 点击「提取并验证模型」，在 macOS 系统窗口中完成一次管理员授权。App 不接收或保存管理员密码。
+4. 完整恢复及 IPA 解密验证通过后，模型会保存到「FairPlay 凭据」。相同模型按内容去重。
+5. 导入或下载 IPA 后选择解密；程序按实际许可证校验模型，无法匹配时仍可使用已有的 16 字节凭据。
+
+本机模型绑定商店注册状态及许可证选择器；同一 Apple ID 的其他下载会话不保证匹配。模型不是 16 字节 `credential.bin`，不能用十六进制凭据入口代替。可在凭据管理中导入、导出或删除模型；原始注册快照及临时验证 IPA 在操作结束后清理。
+
+本机模型恢复取决于注册数据格式和应用许可证；macOS 15+ 的 App 启动支持不代表所有系统注册状态都能恢复。部分旧应用没有明文哈希，此时会显示校验范围，不能视为全部明文校验通过。
+
+## Mac 越狱设备提取
 
 1. 连接并解锁越狱设备，确认 SSH 服务可用。
 2. 在设备提取页选择 USB 或网络连接，填写用户名、端口及认证信息。

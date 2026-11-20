@@ -17,7 +17,8 @@ def main():
     run([resources/'Python/bin/python3','-I','-c','import cryptography, cffi; from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes; c=Cipher(algorithms.AES(bytes(16)),modes.ECB()).encryptor(); assert len(c.update(bytes(16)))==16; print("python-crypto: passed")'])
     run([resources/'Python/bin/python3',resources/'Extractor/host.py','--help'])
     for name in ['idevice_id','ideviceinfo','iproxy']:run([resources/'bin'/name,'--version'])
-    report={'system':platform.mac_ver()[0],'architecture':platform.machine(),'launch':'passed','python_crypto':'passed','extractor_cli':'passed','usb_helpers':'passed','scope':'Packaged app startup and offline helper checks; no Apple account, download, device SSH or decryption acceptance'}
+    run([resources/'bin/unfairplay','--version'])
+    report={'system':platform.mac_ver()[0],'architecture':platform.machine(),'launch':'passed','python_crypto':'passed','extractor_cli':'passed','usb_helpers':'passed','enrollment_helper':'passed','scope':'Packaged app startup and offline helper checks; no Apple account, download, device SSH or decryption acceptance'}
     if args.report:args.report.write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report))
 if __name__=='__main__':main()

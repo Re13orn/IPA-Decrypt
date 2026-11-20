@@ -77,6 +77,15 @@
       "excluded": [
         "build"
       ]
+    },
+    {
+      "name": "UnfairPlay",
+      "path": "apps/macos/ThirdPartySource/UnfairPlay",
+      "revision": "d7503082a59e3dcfdd3ea7a70434dcecaaaf07df",
+      "license": "MIT AND Apache-2.0",
+      "tree_sha256": "65e622873dea96af7842607daddfe725c0e23ebd7327f64d4e6c21aae2b59103",
+      "files": 245,
+      "excluded": []
     }
   ],
   "files": [

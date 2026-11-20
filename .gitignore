@@ -45,3 +45,5 @@ apps/macos/Resources/Extractor/credential-retrieval/build/
 **/NativeStoreRuntime/amd-generator.mjs
 **/NativeStoreRuntime/crypto-worker.js
 apps/macos/ThirdPartySource/ipatool/internal/store/profile/data_generated.go
+
+apps/macos/Vendor/unfairplay

@@ -26,7 +26,7 @@ Mac：安装 Go（引导工具链后固定到 go1.26.5）、CMake、Ninja 和 Xc
 python3 apps/macos/Tools/build-core.py --work "$PWD/.build-work/native-macos"
 ```
 
-从 `apps/macos/ThirdPartySource` 的补丁后快照重建 AppleAuth 和 ipatool，写入 Mac Vendor 中的生成库。JSON/LZFSE 均来自固定的仓库内源码，不再读取 Homebrew JSON 头文件或远程 FetchContent。Go 通过 go.mod/go.sum 联网校验下载。完整本机隔离验证与剩余新机器条件见 RELEASE_AUDIT.md。
+从 `apps/macos/ThirdPartySource` 的补丁后快照重建 AppleAuth、ipatool 和本机模型组件 UnfairPlay，写入 Mac Vendor 中的生成库。JSON/LZFSE 均来自固定的仓库内源码，不再读取 Homebrew JSON 头文件或远程 FetchContent。Go 通过 go.mod/go.sum 联网校验下载。完整本机隔离验证与剩余新机器条件见 RELEASE_AUDIT.md。
 
 iOS：
 
@@ -122,3 +122,5 @@ gh workflow run macos-compatibility.yml -f tag=v1.0.1
 ```
 
 此流程应在发布草稿准备完成后运行，通过后再正式发布。完整业务流程和具体用户机器仍需分别验收。
+
+本机模型服务的可选私有验证程序为 `apps/macos/Tools/Tests/EnrollmentIntegration.swift`。仅在本机提供私有快照和已安装应用作为参数，验证恢复、完整解密、重复模型、覆盖导出、许可证不匹配与取消清理。测试不接收密码，真实快照、模型和验证 IPA 禁止进入仓库或公开日志。

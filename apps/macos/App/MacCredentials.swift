@@ -39,7 +39,8 @@ import UniformTypeIdentifiers
                                 if group.records.isEmpty { Text("尚无凭据").font(.caption).foregroundStyle(.secondary) }
                                 ForEach(group.records) { item in
                                     VStack(alignment: .leading, spacing: 5) {
-                                        Label(item.displayName, systemImage: "key")
+                                        Label(item.displayName, systemImage: item.isEnrollment ? "desktopcomputer" : "key")
+                                        Text(item.formatName).font(.caption).foregroundStyle(.secondary)
                                         Text(item.fingerprint).font(.caption.monospaced()).foregroundStyle(.secondary)
                                         if model.credentials.contains(where: { $0.id != item.id && $0.data == item.data }) {
                                             Text("其他归属下也有相同内容").font(.caption2).foregroundStyle(.secondary)
@@ -102,6 +103,15 @@ import UniformTypeIdentifiers
                     .disabled(name == (record.label ?? ""))
             }
             Section("凭据内容") {
+                if record.isEnrollment {
+                    LabeledContent("格式", value: "Mac FairPlay 注册模型")
+                    LabeledContent("大小", value: "\(record.data.count) 字节")
+                    if let selector = record.enrollmentSelector { LabeledContent("许可证 user / key", value: selector).font(.callout.monospaced()) }
+                    if let app = record.sourceApp { LabeledContent("验证应用", value: app) }
+                    LabeledContent("明文哈希校验", value: record.plaintextVerified == true ? "已通过" : "待使用匹配 IPA 验证")
+                    Button("导出本机模型…", systemImage: "square.and.arrow.up") { export() }
+                    Text("模型按实际许可证匹配；Apple ID 仅用于管理归属。模型不是 16 字节 credential.bin，不能转换为该格式使用。").font(.caption).foregroundStyle(.secondary)
+                } else {
                 HStack {
                     Text(reveal ? record.hex : "••••••••••••••••••••••••••••••••")
                         .font(.body.monospaced()).textSelection(.enabled).lineLimit(2)
@@ -117,6 +127,7 @@ import UniformTypeIdentifiers
                     Button("导出 credential.bin…", systemImage: "square.and.arrow.up") { export() }
                 }
                 Text("16 字节凭据可写成 32 位十六进制字符。这里的文本与 credential.bin 保存的是同一份数据，可用于粘贴导入。").font(.caption).foregroundStyle(.secondary)
+                }
             }
             Section("识别信息") {
                 LabeledContent("SHA-256 短指纹", value: record.fingerprint).font(.callout.monospaced())
@@ -128,7 +139,7 @@ import UniformTypeIdentifiers
                     Text("相同内容也保存在：" + matching.map { $0.owner ?? "未绑定" }.sorted().joined(separator: "、"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Apple ID 归属是你设置的标签，无法仅从这 16 字节反查账户。同一 Apple ID 也可能因许可证不同而需要多个凭据。").font(.caption).foregroundStyle(.secondary)
+                Text("Apple ID 归属是你设置的管理标签，不能据此判断许可证适用性。同一账户可能需要多个凭据或模型。").font(.caption).foregroundStyle(.secondary)
             }
             Section("许可证校验记录") {
                 if let proofs = record.verifiedLicenses, !proofs.isEmpty {
@@ -155,7 +166,7 @@ import UniformTypeIdentifiers
     }
     private func attempt(_ operation: () throws -> Void) { do { try operation(); status("更改已保存。") } catch { status(model.friendly(error)) } }
     private func export() {
-        let panel = NSSavePanel(); panel.nameFieldStringValue = "credential-" + String(record.fingerprint.prefix(8)) + ".bin"
+        let panel = NSSavePanel(); panel.nameFieldStringValue = (record.isEnrollment ? "fairplay-model-" : "credential-") + String(record.fingerprint.prefix(8)) + ".bin"
         if panel.runModal() == .OK, let url = panel.url {
             attempt { try record.data.write(to: url, options: .atomic); try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path) }
         }
@@ -216,7 +227,7 @@ import UniformTypeIdentifiers
                 ForEach(model.credentialOwners, id: \.self) { Text($0).tag(Optional($0)) }
             }
             TextField("名称或备注（可选）", text: $label).textFieldStyle(.roundedBorder)
-            Button(incoming == nil ? "选择 credential.bin…" : "导入收到的 " + incoming!.lastPathComponent, systemImage: "doc.badge.plus") {
+            Button(incoming == nil ? "选择 credential.bin 或本机模型…" : "导入收到的 " + incoming!.lastPathComponent, systemImage: "doc.badge.plus") {
                 if let incoming { importFile(incoming) }
                 else { let panel = NSOpenPanel(); panel.allowedContentTypes = [.data]; if panel.runModal() == .OK, let url = panel.url { importFile(url) } }
             }.disabled(reading)
@@ -248,7 +259,15 @@ import UniformTypeIdentifiers
         reading = true
         Task {
             defer { reading = false }
-            do { let data = try await Task.detached { try CredentialFileReader.read(url) }.value; let id = try model.addCredential(data, owner: owner); finish(id: id) }
+            do {
+                let data = try await Task.detached {
+                    let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
+                    if (try url.resourceValues(forKeys: [.fileSizeKey])).fileSize == 16 { return try CredentialFileReader.read(url) }
+                    let data = try MacEnrollment.readModel(url); _ = try MacEnrollment.inspect(data, resources: MacEnrollment.resources()); return data
+                }.value
+                let id = data.count == 16 ? try model.addCredential(data, owner: owner) : try model.addEnrollmentModel(data, owner: owner, origin: "模型文件导入")
+                finish(id: id)
+            }
             catch { problem = model.friendly(error) }
         }
     }

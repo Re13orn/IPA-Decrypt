@@ -7,9 +7,9 @@
 | 平台 | 版本 | 系统要求 |
 | --- | --- | --- |
 | iOS | [1.0.0](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.0) | iOS 16 及以上 |
-| macOS | 1.0.1 | Apple Silicon · macOS 15 及以上 |
+| macOS | 1.0.2 | Apple Silicon · macOS 15 及以上 |
 
-当前发布系列为 `1.0`；macOS 兼容性补丁为 `1.0.1`，iOS 保持 `1.0.0`，详见 [版本策略](docs/VERSIONING.md)。
+当前发布系列为 `1.0`；macOS 为 `1.0.2`，iOS 保持 `1.0.0`，详见 [版本策略](docs/VERSIONING.md)。
 
 ## 界面预览
 
@@ -41,7 +41,7 @@
 | 应用检索 | 按名称、App ID、Bundle ID 或商店链接搜索，查看评分、大小、兼容性、截图与版本说明 |
 | IPA 下载 | 管理 App Store 与 TestFlight 账户，查看下载进度、任务状态并选择历史版本 |
 | 解密与导出 | 校验许可证与凭据匹配，处理本地或已下载 IPA，导出原始包和解密包 |
-| 凭据管理 | 导入 `credential.bin` 或十六进制数据，按内容去重，管理账户标签及凭据记录 |
+| 凭据管理 | 导入 `credential.bin`、十六进制数据或 Mac 本机模型，按内容去重，管理账户标签及记录 |
 | 文件分享 | 通过系统共享或局域网页面下载导出文件 |
 | 设备提取 | Mac 通过 USB / SSH 从越狱设备批量提取凭据，支持连接测试与重复结果合并 |
 | 会话恢复 | 使用已保存密码恢复过期 App Store 会话，并支持交互式验证码验证 |
@@ -52,7 +52,7 @@
 
 从 [Releases](https://github.com/Re13orn/IPA-Decrypt/releases) 下载对应平台附件：
 
-- **macOS**：打开 ARM64 DMG，将「IPA 解密.app」拖入「应用程序」。安装包内置 Python 与 USB 运行依赖。
+- **macOS**：可从本机商店注册状态恢复 FairPlay 模型，无需越狱设备；已有越狱设备提取流程继续可用。打开 ARM64 DMG，将「IPA 解密.app」拖入「应用程序」。安装包内置 Python 与 USB 运行依赖。
 - **iOS**：下载未签名 IPA，使用适用于目标设备的有效签名后安装。
 
 Mac 当前采用 ad-hoc 签名，未公证。文件校验、系统安装提示及首次使用步骤见 [安装指南](docs/INSTALLATION.md)。

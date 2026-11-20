@@ -1074,6 +1074,22 @@
           "value": "Pinned download verified; bundled native dependency notices remain under review"
         }
       ]
+    },
+    {
+      "type": "library",
+      "name": "UnfairPlay",
+      "version": "d7503082a59e3dcfdd3ea7a70434dcecaaaf07df",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "65e622873dea96af7842607daddfe725c0e23ebd7327f64d4e6c21aae2b59103"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "MIT AND Apache-2.0"
+        }
+      ]
     }
   ],
   "metadata": {

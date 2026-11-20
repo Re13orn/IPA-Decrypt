@@ -19,7 +19,7 @@ class InstallationBundleTests(unittest.TestCase):
   data=b'fixture';(runtime/'sap.wasm').write_bytes(data);(runtime/'PROVENANCE.json').write_text(json.dumps({'sha256':{'sap.wasm':hashlib.sha256(data).hexdigest()}}))
   for name in ['index.html','ipalab.mjs']:(runtime/name).write_text('fixture')
   (r/'Storefronts.plist').write_bytes(plistlib.dumps({'143441':'us'}))
-  names=['Python/bin/python3','Extractor/host.py','Extractor/license_plan.py','Extractor/askpass','bin/idevice_id','bin/ideviceinfo','bin/iproxy']+['Extractor/bundle/'+x for x in ['credential.ios','driver.ios','trigger.ios','arcade-capture.ios','static-key-table.bin','core4-word-table.bin']]
+  names=['Python/bin/python3','Extractor/host.py','Extractor/license_plan.py','Extractor/askpass','bin/idevice_id','bin/ideviceinfo','bin/iproxy','bin/unfairplay']+['Extractor/bundle/'+x for x in ['credential.ios','driver.ios','trigger.ios','arcade-capture.ios','static-key-table.bin','core4-word-table.bin']]
   for name in names:
    file=r/name;file.parent.mkdir(parents=True,exist_ok=True);file.write_text('fixture');file.chmod(0o755)
   return app

@@ -25,4 +25,6 @@ cmp "$root/apps/ios/App/AppCatalog.swift" "$mac/App/AppCatalog.swift"
 cmp "$root/apps/ios/App/AppDetailView.swift" "$mac/App/AppDetailView.swift"
 swiftc "$mac/App/AppCatalog.swift" "$root/tests/AppCatalogTests.swift" -o "$out/app-catalog"
 "$out/app-catalog"
+swiftc -parse-as-library "$mac/App/EnrollmentModelFormat.swift" "$mac/App/CredentialRecord.swift" "$mac/Tools/Tests/EnrollmentModelTests.swift" -o "$out/enrollment-models"
+"$out/enrollment-models"
 echo 'PASS: offline synthetic suite (no real account/device authentication)'

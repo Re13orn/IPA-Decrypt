@@ -405,6 +405,16 @@ struct AccountBook: Codable {
         return record.id
     }
 
+    @discardableResult
+    func addEnrollmentModel(_ data: Data, owner: String?, origin: String, appName: String? = nil, verified: Bool? = nil) throws -> UUID {
+        let format = try EnrollmentModelFormat(data)
+        if let old = credentials.first(where: { $0.isEnrollment && $0.data == data }) { return old.id }
+        var record = FairPlayCredential(owner: owner, data: data, label: appName.map { $0 + " · 本机模型" }, addedAt: Date(), origin: origin)
+        record.kind = "mac-enrollment"; record.enrollmentSelector = format.selector
+        record.sourceApp = appName; record.plaintextVerified = verified
+        try saveCredentials(credentials + [record]); return record.id
+    }
+
     func renameCredential(_ id: UUID, label: String) throws {
         guard let index = credentials.firstIndex(where: { $0.id == id }) else { return }
         var updated = credentials
@@ -1290,32 +1300,36 @@ struct AccountBook: Codable {
         if let index = jobs.firstIndex(where: { $0.id == job.id }) { jobs[index].originalComplete = true }
         set(job.id, .imported)
         let receivedJob = jobs.first(where: { $0.id == job.id }) ?? job
-        if !candidateKeys(for: receivedJob).isEmpty { try await decrypt(receivedJob) }
+        if hasCredentials(for: receivedJob) { try await decrypt(receivedJob) }
     }
 
     func decrypt(_ job: LocalJob) async throws {
         guard let source = artifact(job, clear: false) else { throw LabError("原始 IPA 不在设备上。") }
         let credentials = candidateKeys(for: job)
-        guard !credentials.isEmpty else { throw LabError("请导入与此 IPA 授权账户对应的 FairPlay 凭据。") }
+        let models = self.credentials.filter(\.isEnrollment).map(\.data)
+        guard !credentials.isEmpty || !models.isEmpty else { throw LabError("请导入匹配的 FairPlay 凭据，或从本机恢复模型。") }
         let destination = path(for: job, clear: true)
         set(job.id, .decrypting)
         do {
-            try await Task.detached(priority: .userInitiated) {
+            let verified = try await Task.detached(priority: .userInitiated) { () -> Bool? in
+                if !models.isEmpty, let result = try MacEnrollment.decrypt(source: source, destination: destination, models: models, resources: MacEnrollment.resources()) { return result }
+                guard !credentials.isEmpty else { throw LabError("已保存的本机模型与此 IPA 许可证不匹配。请使用与本机相同的商店注册状态获取 IPA，或导入匹配的 credential.bin。") }
                 try FairPlay.decrypt(source: source, destination: destination, keys: credentials)
+                return nil
             }.value
-            set(job.id, .ready)
+            set(job.id, .ready, verified == false ? "解密已完成；部分映像没有可用的明文哈希，无法完成全部明文校验。" : nil)
         } catch {
             set(job.id, .failed, friendly(error))
             throw error
         }
     }
 
-    func hasCredentials(for job: LocalJob) -> Bool { !candidateKeys(for: job).isEmpty }
+    func hasCredentials(for job: LocalJob) -> Bool { !candidateKeys(for: job).isEmpty || credentials.contains(where: \.isEnrollment) }
 
     private func candidateKeys(for job: LocalJob) -> [Data] {
-        if job.source == Flow.local.rawValue { return credentials.map(\.data) }
+        if job.source == Flow.local.rawValue { return credentials.filter { !$0.isEnrollment }.map(\.data) }
         let owner = job.credentialOwner ?? activeProfile(beta: job.source == Flow.beta.rawValue)?.owner
-        return credentials.filter { $0.owner == owner || $0.owner == nil }.map(\.data)
+        return credentials.filter { !$0.isEnrollment && ($0.owner == owner || $0.owner == nil) }.map(\.data)
     }
 
     func friendly(_ error: Error) -> String {
@@ -1324,6 +1338,7 @@ struct AccountBook: Codable {
         if let error = error as? CredentialFileReader.Failure { return error.localizedDescription }
         if let error = error as? AppFileLibrary.Failure { return error.localizedDescription }
         if let error = error as? LabError { return error.message }
+        if let error = error as? EnrollmentModelFormat.Failure { return error.localizedDescription }
         if let error = error as? StoreIssue { return error.message }
         if error is CancellationError { return "操作已取消。" }
         if error is URLError { return "无法连接 Apple 服务。请检查网络后重试。" }

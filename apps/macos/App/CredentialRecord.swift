@@ -21,6 +21,13 @@ struct FairPlayCredential: Codable, Identifiable {
     var origin: String?
     var verifiedLicenses: [CredentialLicenseEvidence]?
 
+    var kind: String?
+    var enrollmentSelector: String?
+    var plaintextVerified: Bool?
+    var sourceApp: String?
+    var isEnrollment: Bool { kind == "mac-enrollment" }
+    var formatName: String { isEnrollment ? "Mac 本机模型" : "16 字节凭据" }
+
     var hex: String { data.map { String(format: "%02x", $0) }.joined() }
     var fingerprint: String { SHA256.hash(data: data).prefix(8).map { String(format: "%02x", $0) }.joined() }
     var displayName: String { label?.isEmpty == false ? label! : "凭据 " + String(fingerprint.prefix(8)).uppercased() }

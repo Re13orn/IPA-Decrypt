@@ -37,7 +37,7 @@ shutil.rmtree(resources / 'PythonPackages', ignore_errors=True)
 # Keep source notices with every local bundle; this does not clear release blockers.
 shutil.copytree(ROOT / 'licenses', resources / 'Licenses', dirs_exist_ok=True)
 shutil.copy2(ROOT / 'LICENSE', resources / 'Licenses/APPLICATION-LICENSE.txt')
-for name, relative in [('AppleAuth', 'Vendor/AppleAuth'), ('ZIPFoundation', 'Vendor/ZIPFoundation'), ('ipatool', 'ThirdPartySource/ipatool'), ('libzip', 'ThirdPartySource/libzip'), ('LZFSE', 'ThirdPartySource/lzfse'), ('JSON', 'ThirdPartySource/nlohmann_json')]:
+for name, relative in [('AppleAuth', 'Vendor/AppleAuth'), ('ZIPFoundation', 'Vendor/ZIPFoundation'), ('ipatool', 'ThirdPartySource/ipatool'), ('libzip', 'ThirdPartySource/libzip'), ('LZFSE', 'ThirdPartySource/lzfse'), ('JSON', 'ThirdPartySource/nlohmann_json'), ('UnfairPlay', 'ThirdPartySource/UnfairPlay')]:
     target = resources / 'Licenses' / name
     target.mkdir(exist_ok=True)
     for original in (BASE / relative).iterdir():
@@ -47,12 +47,13 @@ for name, relative in [('AppleAuth', 'Vendor/AppleAuth'), ('ZIPFoundation', 'Ven
         shutil.copytree(BASE / relative / 'Licenses', target / 'Licenses')
 shutil.copytree(ROOT / 'dependencies', resources / 'DependencyLocks', dirs_exist_ok=True)
 (resources / 'bin').mkdir()
+shutil.copy2(BASE / 'Vendor/unfairplay', resources / 'bin/unfairplay')
 for name in ['idevice_id','ideviceinfo','iproxy']:
     source = USB_PREFIX / 'bin' / name
     shutil.copy2(source.resolve(), resources / 'bin' / name)
 
 # Relocate the selected USB runtime; never reference the build prefix.
-queue = list((resources / 'bin').iterdir()); processed = set()
+queue = [resources / 'bin' / name for name in ['idevice_id','ideviceinfo','iproxy']]; processed = set()
 while queue:
     binary = queue.pop()
     if binary in processed: continue
@@ -73,7 +74,7 @@ while queue:
         relative = os.path.relpath(dest, binary.parent)
         subprocess.run(['install_name_tool','-change',dependency,'@loader_path/' + relative,str(binary)], check=True)
 
-info = dict(CFBundleExecutable='IPADecryptMac', CFBundleIdentifier='local.ipadecrypt.mac', CFBundleName='IPA 解密', CFBundleDisplayName='IPA 解密', CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString='1.0.1', CFBundleVersion='2', LSMinimumSystemVersion='15.0', NSHighResolutionCapable=True, LSMultipleInstancesProhibited=True, NSPrincipalClass='NSApplication', NSLocalNetworkUsageDescription='允许局域网设备下载你主动分享的 IPA。', NSAppTransportSecurity=dict(NSAllowsLocalNetworking=True), CFBundleDocumentTypes=[dict(CFBundleTypeName='IPA 与 FairPlay 凭据',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['public.data'])])
+info = dict(CFBundleExecutable='IPADecryptMac', CFBundleIdentifier='local.ipadecrypt.mac', CFBundleName='IPA 解密', CFBundleDisplayName='IPA 解密', CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString='1.0.2', CFBundleVersion='3', LSMinimumSystemVersion='15.0', NSHighResolutionCapable=True, LSMultipleInstancesProhibited=True, NSPrincipalClass='NSApplication', NSLocalNetworkUsageDescription='允许局域网设备下载你主动分享的 IPA。', NSAppTransportSecurity=dict(NSAllowsLocalNetworking=True), CFBundleDocumentTypes=[dict(CFBundleTypeName='IPA 与 FairPlay 凭据',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['public.data'])])
 (contents / 'Info.plist').write_bytes(plistlib.dumps(info))
 # Preserve ldid signatures/entitlements on device-side iOS helpers.
 for directory in [frameworks, resources / 'bin', resources / 'Python']:

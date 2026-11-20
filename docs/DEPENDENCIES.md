@@ -43,3 +43,9 @@ python3 scripts/check-release.py
 Mac `ipatool/internal/store/profile/data_generated.go` 虽然扩展名是 `.go`，但包含从 AppleMediaServices 和 AMSAccountAuthenticationPlugin 提取、压缩编码的 metadata/pages/plugin，亦排除。它不是可凭外层 MIT 自动批准的普通源码。
 
 本地原件未删除；仅用于显式选择的本地构建验证，不自动下载替代物或将其塞入源码 ZIP。维护者已确认继续推进发布准备；源码导出范围仍按清单执行，独立核实状态保持原样，见 OPEN_SOURCE_READINESS.md。
+
+## Mac 本机模型组件
+
+UnfairPlay 固定至 `d7503082a59e3dcfdd3ea7a70434dcecaaaf07df`，源码位于 `apps/macos/ThirdPartySource/UnfairPlay`，树摘要记录在 `dependencies/sources.lock.json`。原生库构建入口同时以固定 Go 工具链生成 `Vendor/unfairplay`，打包至 `Resources/bin/unfairplay`。该生成文件不进入源码导出。
+
+上游声明为 MIT，DarkPhoenix 部分保留 Apache-2.0，macOSFairFree 部分保留 MIT；对应许可证与 NOTICE 随源码和 App 一并分发。运行时不联网下载额外工具。

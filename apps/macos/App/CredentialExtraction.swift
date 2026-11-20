@@ -273,7 +273,7 @@ enum ExtractorProcess {
         let cache = base.appendingPathComponent("probe-" + UUID().uuidString + ".json")
         var seen = Set<Data>()
         let probes = model.credentials.compactMap { credential -> CredentialProbe? in
-            guard seen.insert(credential.data).inserted else { return nil }
+            guard !credential.isEnrollment, seen.insert(credential.data).inserted else { return nil }
             return CredentialProbe(id: credential.id.uuidString, data: credential.data)
         }
         let data = try JSONEncoder().encode(probes)
@@ -432,7 +432,7 @@ enum ExtractorProcess {
         }
     }
     private func matchSnapshots(_ licenses: [InstalledLicense], folder: URL) async throws -> [InstalledLicense] {
-        let credentials = model.credentials
+        let credentials = model.credentials.filter { !$0.isEnrollment }
         return try await Task.detached(priority: .userInitiated) {
             try licenses.map { item in
                 var result = item
