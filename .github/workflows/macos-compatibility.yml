@@ -7,7 +7,9 @@ on:
         required: true
         default: v1.0.1
 permissions:
-  contents: read
+  # GitHub hides draft releases from read-only installation tokens.
+  # This manually dispatched workflow downloads candidates; it never publishes.
+  contents: write
 jobs:
   packaged-app:
     runs-on: macos-15
