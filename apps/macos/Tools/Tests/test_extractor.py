@@ -285,6 +285,8 @@ class AutomaticTests(unittest.TestCase):
         data=bytes(range(256))
         command, payload=ssh_options.elevate('cat > /tmp/test',data,env=env)
         self.assertIn('sudo -k -S',command)
+        self.assertTrue(command.startswith(ssh_options.BOOTSTRAP_PATH))
+        self.assertNotIn('/bin/sh',command)
         self.assertEqual(payload,b'fixture\n'+data)
     def test_auto_stops_after_two_failed_pairs(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -312,6 +314,14 @@ class SuTests(unittest.TestCase):
         self.assertIn('su 已验证',message)
         self.assertNotIn('root-fixture',message)
         self.assertEqual(su.call_args.kwargs['env']['IPA_ROOT_PASSWORD'],'root-fixture')
+
+    def test_su_rejects_nonroot_identity(self):
+        env=self.environment('su'); process=unittest.mock.Mock(returncode=0)
+        process.communicate.return_value=(b'501\n',b'')
+        with patch.object(host.subprocess,'run',return_value=subprocess.CompletedProcess([],0,'501\nDarwin\n15.7.3\n','')),patch.object(host,'su_start',return_value=(process,b'')):
+            with self.assertRaisesRegex(RuntimeError,'su 未取得 root'):
+                host.probe_access('fixture',22,'fixture',env)
+        self.assertNotEqual(env['IPA_SUDO_MODE'],'su')
 
     def test_auto_falls_back_after_sudo_failure(self):
         env=self.environment(); process=unittest.mock.Mock(returncode=0);process.communicate.return_value=(b'0\n',b'')

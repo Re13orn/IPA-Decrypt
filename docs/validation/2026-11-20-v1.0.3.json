@@ -1,0 +1,43 @@
+{
+  "release": "v1.0.3",
+  "platform": "macos",
+  "version": "1.0.3",
+  "build": "4",
+  "minimum_os": "15.0",
+  "architecture": "arm64",
+  "checks": {
+    "swift_release": "passed",
+    "installation_mach_o_count": 24,
+    "offline_synthetic_suite": "passed",
+    "extractor_python_tests": 27,
+    "packaging_regressions": 8
+  },
+  "jailbroken_device": {
+    "system": "15.7.3",
+    "transport": "USB SSH port 22",
+    "login": "mobile",
+    "automatic_elevation": "sudo; root UID verified",
+    "app_connection_test": "passed",
+    "binary_roundtrip": "passed; all 256 byte values plus NUL/CRLF",
+    "background_root_uid": "passed",
+    "su_with_ssh_password": "not authenticated; separate root password not tested",
+    "scope": "Read-only identity and in-memory transfer. No app launch or credential extraction."
+  },
+  "macos15_runtime": {
+    "status": "passed",
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/44722544248",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "launch": "passed",
+    "python_crypto": "passed",
+    "extractor_cli": "passed",
+    "usb_helpers": "passed",
+    "enrollment_helper": "passed",
+    "scope": "Packaged app startup and offline helpers; no account or device acceptance"
+  },
+  "limits": [
+    "Actual su authentication with a distinct root password remains unverified on hardware.",
+    "Full credential extraction was not repeated.",
+    "No new iOS binary is included."
+  ]
+}
