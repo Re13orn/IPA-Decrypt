@@ -1,0 +1,50 @@
+{
+  "release": "v1.0.2",
+  "platform": "macos",
+  "version": "1.0.2",
+  "build": "3",
+  "minimum_os": "15.0",
+  "architecture": "arm64",
+  "upstream": {
+    "name": "UnfairPlay",
+    "revision": "d7503082a59e3dcfdd3ea7a70434dcecaaaf07df"
+  },
+  "checks": {
+    "swift_release": "passed",
+    "installation_mach_o_count": 24,
+    "offline_synthetic_suite": "passed",
+    "installation_regressions": 5,
+    "release_input_regressions": 3,
+    "upstream_go_tests": "passed",
+    "private_snapshot_recovery": "passed",
+    "private_model_decryption": "passed",
+    "duplicate_model_deduplication": "passed",
+    "atomic_export_replacement": "passed",
+    "selector_mismatch_rejection": "passed",
+    "process_cancellation": "passed",
+    "app_system_authorization": "passed",
+    "app_model_persistence": "passed",
+    "app_plaintext_hash_verification": "passed"
+  },
+  "private_control_host": {
+    "system": "26.4.1",
+    "architecture": "arm64"
+  },
+  "macos15_runtime": {
+    "status": "passed",
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/44718743935",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "launch": "passed",
+    "python_crypto": "passed",
+    "extractor_cli": "passed",
+    "usb_helpers": "passed",
+    "enrollment_helper": "passed",
+    "scope": "Packaged app startup and offline helper checks; no Apple account, download, device SSH or decryption acceptance"
+  },
+  "limits": [
+    "Installed-app validation does not establish downloader enrollment compatibility.",
+    "Model recovery is format and license dependent; macOS 15 startup support is not universal enrollment support.",
+    "No new iOS binary is included."
+  ]
+}

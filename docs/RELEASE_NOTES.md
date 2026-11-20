@@ -24,3 +24,5 @@
 iOS 本次无需更新，继续使用 [1.0.0 的 IPA](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.0)。
 
 本机注册格式恢复能力与 App 系统要求是两个独立范围；未知格式或不匹配许可证会明确报错。完整验证范围见 [兼容性记录](https://github.com/Re13orn/IPA-Decrypt/blob/main/docs/PORTABILITY.md)。
+
+已通过本机 App 内系统授权与模型恢复、私有服务流程验证，以及 [macOS 15 安装包启动验证](https://github.com/Re13orn/IPA-Decrypt/actions/runs/44718743935)。

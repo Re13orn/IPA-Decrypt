@@ -1,12 +1,12 @@
 # 兼容性验证
 
-当前版本：**macOS 1.0.2 (3) · iOS 1.0.0 (1)**。本次结果见 [1.0.1 验证记录](validation/2026-11-20-v1.0.1.json)，iOS 结果见 [1.0.0 验证记录](validation/2026-11-20-v1.0.0.json)。
+当前版本：**macOS 1.0.2 (3) · iOS 1.0.0 (1)**。本次结果见 [1.0.2 验证记录](validation/2026-11-20-v1.0.2.json)，iOS 结果见 [1.0.0 验证记录](validation/2026-11-20-v1.0.0.json)。
 
 ## 平台范围
 
 | 平台 | 系统要求 | 当前版本检查 |
 | --- | --- | --- |
-| macOS | Apple Silicon · macOS 15+ | Release 编译、23 个 Mac 二进制检查；macOS 15.8.2 / arm64 云端启动及离线组件验证通过 |
+| macOS | Apple Silicon · macOS 15+ | Release 编译、24 个 Mac 二进制检查；macOS 15.8.2 / arm64 云端启动及离线组件验证通过 |
 | iOS | iOS 16+ | Release 编译、真机二进制平台及资源检查通过 |
 
 iOS 真机安装需要适用于目标设备的有效签名。实体新设备上的完整登录、下载、解密与分享流程仍待验收。
@@ -19,7 +19,7 @@ Mac 1.0.2 在本机 Apple Silicon / macOS 26.4.1 完成实际系统授权、注�
 
 ## macOS 15 运行验证
 
-[GitHub Actions 验证任务](https://github.com/Re13orn/IPA-Decrypt/actions/runs/44711875497) 在 macOS 15.8.2 / arm64 上下载并校验最终 DMG，复制 App 后检查签名及资源、实际启动 SwiftUI 界面，并验证 Python 加密模块、提取器 CLI 与三个 USB 工具。
+[GitHub Actions 验证任务](https://github.com/Re13orn/IPA-Decrypt/actions/runs/44718743935) 在 macOS 15.8.2 / arm64 上下载并校验最终 DMG，复制 App 后检查签名及资源、实际启动 SwiftUI 界面，并验证 Python 加密模块、提取器 CLI、三个 USB 工具及本机模型组件。
 
 该结果不代表已完成用户反馈设备的 macOS 15.6.1 验收，也不覆盖账户登录、下载和真实设备解密。
 
