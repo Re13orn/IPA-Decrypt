@@ -112,3 +112,13 @@ python3 scripts/check-release.py --macos-app '/path/to/IPA 解密.app' --ios-ipa
 ```
 
 该检查不是新电脑或真机验收的替代品。空白模拟器、包内组件和新设备实体安装的覆盖范围分别记录在 [PORTABILITY.md](PORTABILITY.md)。
+
+## macOS 15 安装包验收
+
+`.github/workflows/macos-compatibility.yml` 可手动指定 Release 标签，在 GitHub 的 macOS 15 / arm64 运行器上下载安装包，核对 DMG 校验值与签名，复制 App 后实际启动 SwiftUI 窗口，并检查包内 Python 加密模块、提取器命令行和 USB 工具。仅验证启动及离线组件，不使用 Apple 账户或真实设备。
+
+```sh
+gh workflow run macos-compatibility.yml -f tag=v1.0.1
+```
+
+此流程应在发布草稿准备完成后运行，通过后再正式发布。完整业务流程和具体用户机器仍需分别验收。

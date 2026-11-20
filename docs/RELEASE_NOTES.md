@@ -19,4 +19,6 @@
 
 Mac 安装包采用 ad-hoc 签名，未完成 Developer ID 公证。iOS 本次无代码变更，继续使用 [1.0.0 的 IPA](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.0)。
 
-验证范围见 [兼容性记录](PORTABILITY.md)。
+已在 macOS 15.8.2 / arm64 的 GitHub 云端机器上通过最终 DMG 校验、App 实际启动及内置 Python / USB 组件检查。[验证任务](https://github.com/Re13orn/IPA-Decrypt/actions/runs/44711875497)
+
+具体用户设备及账户登录、下载、解密流程仍需验收；完整范围见 [兼容性记录](PORTABILITY.md)。

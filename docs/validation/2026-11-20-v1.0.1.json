@@ -1,0 +1,76 @@
+{
+  "release": "v1.0.1",
+  "platform": "macos",
+  "version": "1.0.1",
+  "build": "2",
+  "minimum_os": "15.0",
+  "architecture": "arm64",
+  "installation": {
+    "platform": "macos",
+    "version": "1.0.1",
+    "minimum_os": "15.0",
+    "runtime_hashes_verified": 7,
+    "mach_o_checked": 23,
+    "device_helpers_excluded_from_host_link_check": 4,
+    "result": "passed-structural-installation-check",
+    "scope": "Bundle resource/dependency checks, not independent hardware or account acceptance"
+  },
+  "dmg_sha256": "255b8736f2e19039749d42500a99db80a163c7c58e5a9e78b6e00dd48086ac48",
+  "native_components_rebuilt": [
+    "AppleAuth",
+    "ipatool",
+    "MbedTLS",
+    "libzip",
+    "LZFSE"
+  ],
+  "usb_components_rebuilt": [
+    {
+      "name": "libusbmuxd",
+      "version": "2.1.1"
+    },
+    {
+      "name": "libplist",
+      "version": "2.7.0"
+    },
+    {
+      "name": "libimobiledevice-glue",
+      "version": "1.3.2"
+    },
+    {
+      "name": "libimobiledevice",
+      "version": "1.4.0"
+    },
+    {
+      "name": "openssl@3",
+      "version": "3.6.3"
+    }
+  ],
+  "offline_checks": {
+    "synthetic_suite": "passed",
+    "installation_bundle_regressions": 5,
+    "release_input_regressions": 3,
+    "bundled_python_crypto": "passed",
+    "bundled_extractor_help": "passed",
+    "bundled_usb_tools": "passed",
+    "dmg_integrity": "passed"
+  },
+  "macos15_runtime": {
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/44711875497",
+    "status": "passed",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "app_launch": "passed",
+    "python_crypto": "passed",
+    "extractor_cli": "passed",
+    "usb_helpers": "passed",
+    "release_dmg_checksum": "passed",
+    "signature": "passed"
+  },
+  "remaining_acceptance": [
+    "macOS 15.6.1 user device",
+    "Apple account login and verification",
+    "IPA download and decryption",
+    "USB/SSH extraction with physical device",
+    "Gatekeeper first launch on independent device"
+  ]
+}

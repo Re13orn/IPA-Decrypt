@@ -2,11 +2,11 @@
 
 面向 iOS 和 macOS 的 IPA 下载、解密与凭据管理工具，支持 App Store、TestFlight 及本地 IPA，提供历史版本选择、FairPlay 凭据管理与局域网文件分享。
 
-[下载安装](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.0) · [所有版本](https://github.com/Re13orn/IPA-Decrypt/releases) · [安装指南](docs/INSTALLATION.md) · [构建文档](docs/BUILDING.md)
+[下载安装](https://github.com/Re13orn/IPA-Decrypt/releases/latest) · [所有版本](https://github.com/Re13orn/IPA-Decrypt/releases) · [安装指南](docs/INSTALLATION.md) · [构建文档](docs/BUILDING.md)
 
 | 平台 | 版本 | 系统要求 |
 | --- | --- | --- |
-| iOS | 1.0.0 | iOS 16 及以上 |
+| iOS | [1.0.0](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.0) | iOS 16 及以上 |
 | macOS | 1.0.1 | Apple Silicon · macOS 15 及以上 |
 
 当前发布系列为 `1.0`；macOS 兼容性补丁为 `1.0.1`，iOS 保持 `1.0.0`，详见 [版本策略](docs/VERSIONING.md)。
