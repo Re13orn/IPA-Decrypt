@@ -10,7 +10,8 @@ ROOT = BASE.parents[1]
 WORK = Path(os.environ.get('IPA_MAC_BUILD_WORK', str(ROOT / '.build-work')))
 OUTPUT = Path(os.environ.get('IPA_MAC_OUTPUT', str(ROOT / 'dist/macos')))
 subprocess.run(['python3', str(ROOT / 'scripts/verify-dependencies.py')], check=True)
-subprocess.run(['python3', str(ROOT / 'scripts/verify-usb-runtime.py'), '--prefix', os.environ.get('HOMEBREW_PREFIX', '/opt/homebrew')], check=True)
+USB_PREFIX = Path(os.environ.get('IPA_USB_PREFIX', str(ROOT / '.build-work/usb-runtime/prefix'))).resolve()
+subprocess.run(['python3', str(ROOT / 'scripts/verify-usb-runtime.py'), '--prefix', str(USB_PREFIX)], check=True)
 OUTPUT.mkdir(parents=True, exist_ok=True)
 APP = OUTPUT / 'IPA 解密.app'
 # Build into a unique staging bundle before replacing our previous build.
@@ -47,10 +48,10 @@ for name, relative in [('AppleAuth', 'Vendor/AppleAuth'), ('ZIPFoundation', 'Ven
 shutil.copytree(ROOT / 'dependencies', resources / 'DependencyLocks', dirs_exist_ok=True)
 (resources / 'bin').mkdir()
 for name in ['idevice_id','ideviceinfo','iproxy']:
-    source = Path(os.environ.get('HOMEBREW_PREFIX', '/opt/homebrew')) / 'bin' / name
+    source = USB_PREFIX / 'bin' / name
     shutil.copy2(source.resolve(), resources / 'bin' / name)
 
-# Make every Homebrew dependency self-contained; never reference this build host.
+# Relocate the selected USB runtime; never reference the build prefix.
 queue = list((resources / 'bin').iterdir()); processed = set()
 while queue:
     binary = queue.pop()
@@ -59,7 +60,10 @@ while queue:
     deps = subprocess.check_output(['otool','-L',str(binary)], text=True).splitlines()[1:]
     for line in deps:
         dependency = line.strip().split(' (')[0]
-        if not dependency.startswith('/opt/homebrew/'): continue
+        if dependency == '@loader_path/' + binary.name: continue  # relocated dylib identity
+        if dependency.startswith(('/System/Library/', '/usr/lib/')): continue
+        if not dependency.startswith(str(USB_PREFIX) + '/'):
+            raise SystemExit('USB dependency outside selected runtime prefix: ' + dependency)
         original = Path(dependency)
         dest = frameworks / original.name
         if not dest.exists():
@@ -69,7 +73,7 @@ while queue:
         relative = os.path.relpath(dest, binary.parent)
         subprocess.run(['install_name_tool','-change',dependency,'@loader_path/' + relative,str(binary)], check=True)
 
-info = dict(CFBundleExecutable='IPADecryptMac', CFBundleIdentifier='local.ipadecrypt.mac', CFBundleName='IPA 解密', CFBundleDisplayName='IPA 解密', CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString='1.0.0', CFBundleVersion='1', LSMinimumSystemVersion='26.0', NSHighResolutionCapable=True, LSMultipleInstancesProhibited=True, NSPrincipalClass='NSApplication', NSLocalNetworkUsageDescription='允许局域网设备下载你主动分享的 IPA。', NSAppTransportSecurity=dict(NSAllowsLocalNetworking=True), CFBundleDocumentTypes=[dict(CFBundleTypeName='IPA 与 FairPlay 凭据',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['public.data'])])
+info = dict(CFBundleExecutable='IPADecryptMac', CFBundleIdentifier='local.ipadecrypt.mac', CFBundleName='IPA 解密', CFBundleDisplayName='IPA 解密', CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString='1.0.1', CFBundleVersion='2', LSMinimumSystemVersion='15.0', NSHighResolutionCapable=True, LSMultipleInstancesProhibited=True, NSPrincipalClass='NSApplication', NSLocalNetworkUsageDescription='允许局域网设备下载你主动分享的 IPA。', NSAppTransportSecurity=dict(NSAllowsLocalNetworking=True), CFBundleDocumentTypes=[dict(CFBundleTypeName='IPA 与 FairPlay 凭据',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['public.data'])])
 (contents / 'Info.plist').write_bytes(plistlib.dumps(info))
 # Preserve ldid signatures/entitlements on device-side iOS helpers.
 for directory in [frameworks, resources / 'bin', resources / 'Python']:

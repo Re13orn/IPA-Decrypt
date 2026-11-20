@@ -2,7 +2,7 @@
 
 ## 环境及边界
 
-现有本机验证使用 Apple Silicon、Xcode 26 系列工具链。iOS 最低 16，Mac 工程目前最低 macOS 26。这是当前工程设置，不表示协议本身只能在这些系统运行。
+现有本机验证使用 Apple Silicon、Xcode 26 系列工具链。iOS 最低 16，Mac 工程最低 macOS 15。这是当前工程设置，不表示协议本身只能在这些系统运行。
 
 源码仓库与发布包分开：`apps/` 源码，`.build-work/` 可丢弃构建目录，`dist/` 输出；这两个生成目录不进入 Git。Apple 开发者证书、设备描述文件与真实凭据也不进入仓库。
 
@@ -54,7 +54,13 @@ python3 scripts/build-native-ios.py --work "$PWD/.build-work/native-ios"
 python3 scripts/bootstrap-python.py --work "$PWD/.build-work/python-runtime"
 ```
 
-该目录需全新；失败后可保留 downloads 重新下载校验，已存在的 python/packages 不会覆盖。工具依赖来自 Homebrew 的 idevice_id / ideviceinfo / iproxy；打包前校验实际 9 个链接文件，版本或字节变化会停止，不能用随意升级的 Homebrew 替代固定输入。
+该目录需全新；失败后可保留 downloads 重新下载校验，已存在的 python/packages 不会覆盖。USB 工具及其 OpenSSL、libplist、glue、libusbmuxd、libimobiledevice 依赖从锁定源码构建，统一目标为 macOS 15 / arm64。先安装 CMake、Ninja、pkg-config、Autoconf、Automake 和 GNU libtool 等构建工具，再执行：
+
+```sh
+python3 scripts/bootstrap-usb.py --work "$PWD/.build-work/usb-runtime"
+```
+
+打包默认使用 `.build-work/usb-runtime/prefix`；可通过 `IPA_USB_PREFIX` 指定其他同样经过构建的目录。源码下载逐项校验锁文件哈希，打包校验 9 个实际链接文件及构建记录；不依赖 Homebrew 安装的运行库。
 
 ```sh
 export IPA_PYTHON_HOME="$PWD/.build-work/python-runtime/python"

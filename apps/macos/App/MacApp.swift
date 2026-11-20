@@ -9,6 +9,10 @@ import UniformTypeIdentifiers
         WindowGroup("IPA 解密") {
             MacWorkspace(model: model).frame(minWidth: 980, minHeight: 660)
                 .task {
+                    if ProcessInfo.processInfo.arguments.contains("--launch-check") {
+                        print("mac-launch-check: passed"); fflush(stdout)
+                        NSApplication.shared.terminate(nil)
+                    }
                     if ProcessInfo.processInfo.arguments.contains("--native-runtime-check") {
                         do {
                             let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

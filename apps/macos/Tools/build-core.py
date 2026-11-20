@@ -13,7 +13,7 @@ def run(*args,**kwargs): subprocess.run([str(x) for x in args],check=True,**kwar
 jsonconfig=w/'json-package';jsonconfig.mkdir(exist_ok=True)
 (jsonconfig/'nlohmann_jsonConfig.cmake').write_text('add_library(nlohmann_json::nlohmann_json INTERFACE IMPORTED)\nset_target_properties(nlohmann_json::nlohmann_json PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "'+str(source/'nlohmann_json/single_include')+'")\n')
 (jsonconfig/'nlohmann_jsonConfigVersion.cmake').write_text('set(PACKAGE_VERSION "3.12.0")\nset(PACKAGE_VERSION_COMPATIBLE TRUE)\n')
-flags=['-G' ,'Ninja','-DCMAKE_BUILD_TYPE=Release','-DBUILD_SHARED_LIBS=OFF','-DCMAKE_OSX_ARCHITECTURES=arm64','-DCMAKE_OSX_DEPLOYMENT_TARGET=26.0']
+flags=['-G' ,'Ninja','-DCMAKE_BUILD_TYPE=Release','-DBUILD_SHARED_LIBS=OFF','-DCMAKE_OSX_ARCHITECTURES=arm64','-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0']
 mb=w/'mbedtls-3.6.5'
 if not mb.exists():
     with tarfile.open(source/'mbedtls-3.6.5.tar.bz2') as t: t.extractall(w,filter='data')
@@ -33,6 +33,6 @@ run('xcodebuild','-create-xcframework','-library',w/'libapple_auth.a','-headers'
 target=BASE/'Vendor/AppleAuth/Artifacts/apple_auth.xcframework'
 if target.exists(): shutil.rmtree(target)
 shutil.copytree(artifact,target)
-env=dict(os.environ,MACOSX_DEPLOYMENT_TARGET='26.0',CGO_CFLAGS='-mmacosx-version-min=26.0',CGO_LDFLAGS='-mmacosx-version-min=26.0',CGO_ENABLED='1',GOOS='darwin',GOARCH='arm64')
+env=dict(os.environ,MACOSX_DEPLOYMENT_TARGET='15.0',CGO_CFLAGS='-mmacosx-version-min=15.0',CGO_LDFLAGS='-mmacosx-version-min=15.0',CGO_ENABLED='1',GOOS='darwin',GOARCH='arm64')
 run('go','build','-trimpath','-ldflags=-s -w','-buildmode=c-archive','-o',BASE/'Vendor/libipatool.a','./ipalabbridge',cwd=source/'ipatool',env=env)
 print('Native libraries rebuilt')

@@ -7,9 +7,9 @@
 | 平台 | 版本 | 系统要求 |
 | --- | --- | --- |
 | iOS | 1.0.0 | iOS 16 及以上 |
-| macOS | 1.0.0 | Apple Silicon · macOS 26 及以上 |
+| macOS | 1.0.1 | Apple Silicon · macOS 15 及以上 |
 
-iOS 与 macOS 使用统一版本号，当前维护版本为 `1.0.0`，详见 [版本策略](docs/VERSIONING.md)。
+当前发布系列为 `1.0`；macOS 兼容性补丁为 `1.0.1`，iOS 保持 `1.0.0`，详见 [版本策略](docs/VERSIONING.md)。
 
 ## 界面预览
 

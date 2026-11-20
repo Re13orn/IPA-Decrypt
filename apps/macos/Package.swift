@@ -2,7 +2,7 @@
 import PackageDescription
 import Foundation
 let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().path
-let package = Package(name: "IPADecryptMac", platforms: [.macOS("26.0")], dependencies: [
+let package = Package(name: "IPADecryptMac", platforms: [.macOS("15.0")], dependencies: [
     .package(path: "Vendor/AppleAuth"), .package(path: "Vendor/ZIPFoundation")
 ], targets: [
     .target(name: "MacBridge", path: "MacBridge", publicHeadersPath: "include", linkerSettings: [

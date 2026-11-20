@@ -16,7 +16,7 @@
 | Go | 工具链 go1.26.5，go.mod/go.sum 固定 | 完整模块图记录 202 项；Mac 桥接实际导入 50 项，收集根目录 notices；嵌套第三方代码审查仍需完成 |
 | CPython | 3.12.14 / standalone build 20260901，aarch64-apple-darwin | 固定官方发行 URL 与 SHA-256；CPython LICENSE 已保留，独立发行内其他原生库 notices 尚需核齐 |
 | cryptography / cffi / pycparser | 50.0.2 / 2.1.1 / 3.12，精确 macOS arm64 wheel | PyPI JSON 哈希与下载字节一致；分别 Apache-2.0 OR BSD-3-Clause、MIT-0、BSD-3-Clause；wheel notices 已保留 |
-| USB 工具 / dylib | libimobiledevice 1.4.0、libusbmuxd 2.1.1、libplist 2.7.0、glue 1.3.2、OpenSSL 3.6.3 | 锁定实际链接的 9 个文件；保留 Cellar notices、源包 URL/hash；LGPL/GPL 对应源码等分发义务及新机器引导仍需完成 |
+| USB 工具 / dylib | libimobiledevice 1.4.0、libusbmuxd 2.1.1、libplist 2.7.0、glue 1.3.2、OpenSSL 3.6.3 | 源包 URL/hash 锁定；macOS 15 / arm64 源码构建，校验 9 个实际链接文件及构建记录；保留许可与来源说明 |
 
 ## 锁文件与校验
 

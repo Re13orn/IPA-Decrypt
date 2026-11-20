@@ -7,15 +7,15 @@ class InstallationBundleTests(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
   cls.work=tempfile.TemporaryDirectory();cls.root=Path(cls.work.name);cls.main=cls.root/'main';cls.external=cls.root/'external'
-  subprocess.run(['xcrun','clang','-arch','arm64','-mmacosx-version-min=26.0','-x','c','-','-o',str(cls.main)],input=b'int main(void){return 0;}',check=True,capture_output=True)
+  subprocess.run(['xcrun','clang','-arch','arm64','-mmacosx-version-min=15.0','-x','c','-','-o',str(cls.main)],input=b'int main(void){return 0;}',check=True,capture_output=True)
   library=cls.root/'libfixture.dylib'
-  subprocess.run(['xcrun','clang','-arch','arm64','-mmacosx-version-min=26.0','-dynamiclib','-install_name','/opt/homebrew/lib/libfixture.dylib','-x','c','-','-o',str(library)],input=b'int fixture(void){return 1;}',check=True,capture_output=True)
-  subprocess.run(['xcrun','clang','-arch','arm64','-mmacosx-version-min=26.0','-x','c','-','-x','none',str(library),'-o',str(cls.external)],input=b'extern int fixture(void);int main(void){return fixture();}',check=True,capture_output=True)
+  subprocess.run(['xcrun','clang','-arch','arm64','-mmacosx-version-min=15.0','-dynamiclib','-install_name','/opt/homebrew/lib/libfixture.dylib','-x','c','-','-o',str(library)],input=b'int fixture(void){return 1;}',check=True,capture_output=True)
+  subprocess.run(['xcrun','clang','-arch','arm64','-mmacosx-version-min=15.0','-x','c','-','-x','none',str(library),'-o',str(cls.external)],input=b'extern int fixture(void);int main(void){return fixture();}',check=True,capture_output=True)
  @classmethod
  def tearDownClass(cls):cls.work.cleanup()
  def make_bundle(self,root):
   app=root/'Fixture.app';contents=app/'Contents';(contents/'MacOS').mkdir(parents=True);r=contents/'Resources';runtime=r/'NativeStoreRuntime';runtime.mkdir(parents=True)
-  (contents/'Info.plist').write_bytes(plistlib.dumps({'CFBundleExecutable':'Fixture','LSMinimumSystemVersion':'26.0','CFBundleShortVersionString':'1.0'}));shutil.copyfile(self.main,contents/'MacOS/Fixture');(contents/'MacOS/Fixture').chmod(0o755)
+  (contents/'Info.plist').write_bytes(plistlib.dumps({'CFBundleExecutable':'Fixture','LSMinimumSystemVersion':'15.0','CFBundleShortVersionString':'1.0'}));shutil.copyfile(self.main,contents/'MacOS/Fixture');(contents/'MacOS/Fixture').chmod(0o755)
   data=b'fixture';(runtime/'sap.wasm').write_bytes(data);(runtime/'PROVENANCE.json').write_text(json.dumps({'sha256':{'sap.wasm':hashlib.sha256(data).hexdigest()}}))
   for name in ['index.html','ipalab.mjs']:(runtime/name).write_text('fixture')
   (r/'Storefronts.plist').write_bytes(plistlib.dumps({'143441':'us'}))
@@ -32,6 +32,11 @@ class InstallationBundleTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as tmp:
    app=self.make_bundle(Path(tmp));shutil.copyfile(self.external,app/'Contents/MacOS/Fixture')
    with self.assertRaisesRegex(installation.InvalidBundle,'External dependency'):installation.inspect(app,'macos')
+ def test_helper_requiring_newer_os_than_declared_is_rejected(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   app=self.make_bundle(Path(tmp));helper=app/'Contents/Resources/bin/iproxy'
+   subprocess.run(['xcrun','clang','-arch','arm64','-mmacosx-version-min=26.0','-x','c','-','-o',str(helper)],input=b'int main(void){return 0;}',check=True,capture_output=True)
+   with self.assertRaisesRegex(installation.InvalidBundle,'Binary requires newer OS.*iproxy'):installation.inspect(app,'macos')
  def test_private_state_and_simulator_distribution_rejected(self):
   with tempfile.TemporaryDirectory() as tmp:
    app=self.make_bundle(Path(tmp));(app/'Contents/Resources/accounts-v2.json').write_text('{}')
