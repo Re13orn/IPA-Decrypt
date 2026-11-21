@@ -1,0 +1,63 @@
+{
+  "release": "v1.0.6",
+  "platforms": {
+    "macos": {
+      "version": "1.0.6",
+      "build": "7",
+      "minimum_os": "15.0",
+      "architecture": "arm64",
+      "release_build": "passed",
+      "packaged_mach_o_count": 24,
+      "installed_launch_check": "passed"
+    },
+    "ios": {
+      "version": "1.0.3",
+      "build": "4",
+      "minimum_os": "16.0",
+      "release_device_build": "passed",
+      "unsigned_ipa_resources": "passed",
+      "arm64_simulator_build": "passed",
+      "simulator_system": "26.3",
+      "simulator_device": "iPhone 17 Pro"
+    }
+  },
+  "checks": {
+    "offline_synthetic_suite": "passed",
+    "extractor_python_tests": 27,
+    "packaging_regressions": 8,
+    "candidate_selection": "passed; preferred/unbound labels first, other labels retained, duplicate bytes and model/malformed keys excluded",
+    "synthetic_decryption": "passed; wrong candidate followed by correct candidate produces expected plaintext and CRC with cryptid cleared",
+    "wrong_key_only": "rejected; no output artifact retained",
+    "input_ipa_unchanged": "passed",
+    "source_privacy_scan": "passed; bounded scan"
+  },
+  "ui_checks": [
+    "Mac credential library offers acquisition choices and entry into IPA history.",
+    "Mac acquisition menu navigates to local model extraction.",
+    "Local extraction shows application selection, extraction/verification and format scope.",
+    "Jailbroken-device extraction shows connection/test/extract groups with optional IPA source settings collapsed.",
+    "Mac credential use action navigates into existing IPA history.",
+    "iPhone empty credential sheet shows supported formats and acquisition route.",
+    "A public synthetic 16-byte credential was pasted and saved in an initially empty simulator; import fields collapsed and the next-action button became available.",
+    "iPhone next-action button closed credential management and returned to IPA acquisition.",
+    "Synthetic simulator state was restored after the check."
+  ],
+  "limits": [
+    "No real credential extraction, administrator authorization or SSH extraction was repeated.",
+    "Success-only extraction completion links were compiled but not exercised with a new real extraction.",
+    "No physical iPhone installation acceptance was performed.",
+    "UI checks were performed on 2026-11-21; release completion recorded on 2026-11-22."
+  ],
+  "macos15_runtime": {
+    "status": "passed",
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/44954610410",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "launch": "passed",
+    "python_crypto": "passed",
+    "extractor_cli": "passed",
+    "usb_helpers": "passed",
+    "enrollment_helper": "passed",
+    "scope": "Packaged app startup and offline helpers; no real account or hardware acceptance"
+  }
+}
