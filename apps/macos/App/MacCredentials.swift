@@ -33,6 +33,9 @@ import UniformTypeIdentifiers
             HSplitView {
                 VStack(spacing: 0) {
                     TextField("搜索 Apple ID、名称或指纹", text: $query).textFieldStyle(.roundedBorder).padding(12)
+                    if groups.isEmpty {
+                        ContentUnavailableView("没有匹配的凭据", systemImage: "magnifyingglass", description: Text("尝试其他 Apple ID、名称或指纹。"))
+                    }
                     List(selection: $selected) {
                         ForEach(groups) { group in
                             Section {
@@ -90,12 +93,15 @@ import UniformTypeIdentifiers
     @State private var name = ""
     @State private var assigning = false
     @State private var deleting = false
+    @State private var showMetadata = false
+    @State private var showVerification = false
 
     private var matching: [FairPlayCredential] { model.credentials.filter { $0.id != record.id && $0.data == record.data } }
     var body: some View {
         Form {
             Section {
-                Label(record.displayName, systemImage: "key.fill").font(.title2.bold())
+                Label(record.displayName, systemImage: record.isEnrollment ? "desktopcomputer" : "key.fill").font(.title2.bold())
+                Text(record.formatName).font(.callout).foregroundStyle(.secondary)
                 LabeledContent("归属 Apple ID", value: record.owner ?? "未绑定")
                 Button("更改归属 Apple ID…") { assigning = true }
                 TextField("名称或备注", text: $name, prompt: Text("例如：常用 App 凭据、测试版凭据"))
@@ -129,7 +135,8 @@ import UniformTypeIdentifiers
                 Text("16 字节凭据可写成 32 位十六进制字符。这里的文本与 credential.bin 保存的是同一份数据，可用于粘贴导入。").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Section("识别信息") {
+            Section {
+                DisclosureGroup("来源与识别信息", isExpanded: $showMetadata) {
                 LabeledContent("SHA-256 短指纹", value: record.fingerprint).font(.callout.monospaced())
                 Text("短指纹用于识别相同内容，不是凭据本身。").font(.caption).foregroundStyle(.secondary)
                 LabeledContent("来源", value: record.origin ?? "旧版凭据，来源未记录")
@@ -141,7 +148,9 @@ import UniformTypeIdentifiers
                 }
                 Text("Apple ID 归属是你设置的管理标签，不能据此判断许可证适用性。同一账户可能需要多个凭据或模型。").font(.caption).foregroundStyle(.secondary)
             }
-            Section("许可证校验记录") {
+            }
+            Section {
+                DisclosureGroup("许可证校验记录", isExpanded: $showVerification) {
                 if let proofs = record.verifiedLicenses, !proofs.isEmpty {
                     ForEach(Array(proofs.enumerated()), id: \.offset) { _, proof in
                         LabeledContent("实际触发 App", value: proof.appName + " · " + proof.bundleID)
@@ -152,6 +161,7 @@ import UniformTypeIdentifiers
                 } else {
                     Text("尚未记录目标许可证校验。此记录的账户归属为手动标签或旧版数据，不能据此证明实际来源账户。").foregroundStyle(.secondary)
                 }
+            }
             }
             Section { Button("删除此凭据…", systemImage: "trash", role: .destructive) { deleting = true } }
         }.formStyle(.grouped)

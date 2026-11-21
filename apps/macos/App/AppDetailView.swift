@@ -22,17 +22,21 @@ struct AppArtwork: View {
 
 struct AppListingLabel: View {
     let app: AppResult
+    private var metadata: String {
+        var parts: [String] = []
+        if let version = app.version { parts.append("v" + version) }
+        if let size = app.sizeText { parts.append(size) }
+        if let rating = app.ratingText { parts.append("★ " + rating) }
+        return parts.joined(separator: " · ")
+    }
     var body: some View {
         HStack(spacing: 12) {
             AppArtwork(app: app)
             VStack(alignment: .leading, spacing: 4) {
                 Text(app.trackName).font(.headline).foregroundStyle(.primary).lineLimit(2)
                 Text(app.categoryText ?? app.bundleId).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                HStack(spacing: 8) {
-                    if let version = app.version { Text("v" + version) }
-                    if let size = app.sizeText { Text(size) }
-                    if let rating = app.ratingText { Label(rating, systemImage: "star.fill").labelStyle(.titleAndIcon) }
-                }.font(.caption).foregroundStyle(.secondary)
+                Text(metadata)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
         }.padding(.vertical, 5).frame(maxWidth: .infinity, alignment: .leading)
     }

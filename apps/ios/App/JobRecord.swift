@@ -69,3 +69,19 @@ struct LocalJob: Codable, Identifiable {
     }
 }
 
+
+enum JobListFilter: String, CaseIterable, Identifiable {
+    case all = "全部", active = "进行中", pending = "待处理", completed = "已完成"
+    var id: String { rawValue }
+    func includes(_ job: LocalJob, query: String = "") -> Bool {
+        let stateMatches: Bool
+        switch self {
+        case .all: stateMatches = true
+        case .active: stateMatches = job.state == .downloading || job.state == .decrypting
+        case .pending: stateMatches = job.state == .imported || job.state == .failed
+        case .completed: stateMatches = job.state == .ready
+        }
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return stateMatches && (term.isEmpty || [job.name, job.source, job.version ?? "", job.storeApp?.bundleId ?? "", job.betaBundle ?? ""].contains { $0.localizedStandardContains(term) })
+    }
+}

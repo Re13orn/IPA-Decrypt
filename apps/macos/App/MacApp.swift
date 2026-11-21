@@ -55,6 +55,9 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var query = ""
     @State private var results: [AppResult] = []
     @State private var searched = false
+    @State private var historyQuery = ""
+    @State private var historyFilter: JobListFilter = .all
+    @State private var testsLoaded = false
     @State private var detail: AppSelection?
     private enum DetailAction { case download(AppResult), versions(AppResult), acquire(AppResult) }
     @State private var detailAction: DetailAction?
@@ -147,11 +150,11 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
             Button("删除", role: .destructive) { if let removing { do { try model.removeJob(removing) } catch { model.message = model.friendly(error) } }; removing = nil }
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("ImportIPA"))) { _ in importIPA() }
-        .onChange(of: model.accounts.activeBeta) { tests = [] }
+        .onChange(of: model.accounts.activeBeta) { tests = []; testsLoaded = false }
         .onChange(of: model.accounts.activeStore) { results = []; searched = false }
         .onChange(of: model.country) { results = []; searched = false }
         .onOpenURL { url in
-            if url.pathExtension.lowercased() == "ipa" { run("正在导入 IPA") { try await model.importIPA(url) }; page = .history }
+            if url.pathExtension.lowercased() == "ipa" { showHistory(); run("正在导入 IPA") { try await model.importIPA(url) } }
             else if url.pathExtension.lowercased() == "bin" { incomingCredential = url; page = .credentials }
         }
     }
@@ -184,32 +187,93 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
             if model.action == "正在搜索" { Spacer(); ProgressView("正在搜索 App Store…"); Spacer() }
             else if results.isEmpty { ContentUnavailableView(searched ? "未找到应用" : "查找 App Store 应用", systemImage: "magnifyingglass", description: Text(searched ? "请尝试其他名称、应用链接或商店地区。" : "输入应用名称、App ID、Bundle ID 或 App Store 链接。")) }
             else {
+                HStack {
+                    Text("\(results.count) 个结果").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("点击应用查看详情").font(.caption).foregroundStyle(.secondary)
+                }.padding(.horizontal).padding(.vertical, 8)
                 List(results) { app in
                     HStack(spacing: 14) {
                         Button { detail = AppSelection(app: app, country: model.country) } label: { AppListingLabel(app: app) }
                             .buttonStyle(.plain).accessibilityLabel("查看详情，\(app.trackName)")
-                        Button("详情") { detail = AppSelection(app: app, country: model.country) }
-                        Menu("下载") {
+                        Button("下载 IPA") { requestStore(app, kind: .latest) }
+                            .help("下载最新版 \(app.trackName)").disabled(model.action != nil)
+                        Menu {
+
                             Button("最新版本") { requestStore(app, kind: .latest) }
                             Button("选择历史版本…") { requestStore(app, kind: .versions) }
                             if app.price == 0 { Button("获取免费授权") { requestStore(app, kind: .acquire) } }
-                        }.disabled(model.action != nil)
+                        } label: { Image(systemName: "ellipsis.circle") }
+                        .menuStyle(.borderlessButton).fixedSize()
+                        .accessibilityLabel("更多选项，\(app.trackName)").help("历史版本与免费授权")
+                        .disabled(model.action != nil)
                     }.padding(.vertical, 6)
                 }
             }
         }
     }
     private var betaView: some View {
-        VStack {
-            HStack { Text("已加入的测试").font(.title2.bold()); Spacer(); Button("刷新", systemImage: "arrow.clockwise") { loadTests() }.disabled(!model.betaConnected || model.action != nil) }.padding()
-            if tests.isEmpty { ContentUnavailableView("TestFlight", systemImage: "paperplane", description: Text(model.betaConnected ? "点击刷新读取测试目录。" : "先登录 TestFlight 账户。")) }
-            else { List(tests) { app in HStack { VStack(alignment: .leading, spacing: 4) { Text(app.name).font(.headline); Text(app.id).font(.caption).foregroundStyle(.secondary) }; Spacer(); Button("下载 IPA") { page = .history; run("正在下载测试版") { try await model.downloadBeta(app.name, bundle: app.id) } }.disabled(model.action != nil) }.padding(.vertical, 8) } }
-        }.task { if tests.isEmpty && model.betaConnected { loadTests() } }
+        VStack(spacing: 0) {
+            HStack {
+                Text("已加入的测试").font(.headline)
+                if testsLoaded { Text("\(tests.count) 个 App").font(.caption).foregroundStyle(.secondary) }
+                Spacer()
+                Button("刷新", systemImage: "arrow.clockwise") { loadTests() }.disabled(!model.betaConnected || model.action != nil)
+            }.padding()
+            Divider()
+            if !model.betaConnected {
+                ContentUnavailableView {
+                    Label("登录 TestFlight", systemImage: "paperplane")
+                } description: {
+                    Text("使用已加入测试的 Apple 账户读取应用列表。")
+                } actions: {
+                    Button("登录 TestFlight") { loginBeta = true; login = true }.buttonStyle(.borderedProminent).disabled(model.action != nil)
+                }
+            } else if model.action == "正在读取测试目录" {
+                Spacer(); ProgressView("正在读取测试列表…"); Spacer()
+            } else if tests.isEmpty {
+                ContentUnavailableView {
+                    Label(testsLoaded ? "暂无可用测试" : "读取测试列表", systemImage: "paperplane")
+                } description: {
+                    Text(testsLoaded ? "当前账户未返回可用的测试 App，可更换账户或稍后刷新。" : "刷新列表以查看此账户加入的测试。")
+                } actions: {
+                    Button("刷新列表") { loadTests() }.disabled(model.action != nil)
+                    Button("账户设置") { loginBeta = true; login = true }.disabled(model.action != nil)
+                }
+            } else {
+                List(tests) { app in
+                    HStack(spacing: 14) {
+                        Image(systemName: "app.badge").font(.title2).foregroundStyle(.secondary).frame(width: 44, height: 44)
+                        VStack(alignment: .leading, spacing: 4) { Text(app.name).font(.headline); Text(app.id).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+                        Spacer()
+                        Button("下载 IPA") { showHistory(); run("正在下载测试版") { try await model.downloadBeta(app.name, bundle: app.id) } }.disabled(model.action != nil)
+                    }.padding(.vertical, 8)
+                }
+            }
+        }.task { if !testsLoaded && model.betaConnected { loadTests() } }
     }
+    private var visibleJobs: [LocalJob] { model.jobs.filter { historyFilter.includes($0, query: historyQuery) } }
     private var historyView: some View {
-        Group {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                TextField("搜索名称、版本或 Bundle ID", text: $historyQuery).textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("搜索处理记录")
+                Picker("状态", selection: $historyFilter) {
+                    ForEach(JobListFilter.allCases) { Text($0.rawValue).tag($0) }
+                }.pickerStyle(.segmented).frame(maxWidth: 320)
+                Text("\(visibleJobs.count) 项").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }.padding()
+            Divider()
+            Group {
             if model.jobs.isEmpty { ContentUnavailableView("尚无处理记录", systemImage: "tray", description: Text("从商店下载或导入本地 IPA 后，进度与结果会显示在这里。")) }
-            else { List(model.jobs) { job in
+            else if visibleJobs.isEmpty {
+                ContentUnavailableView {
+                    Label("没有匹配的记录", systemImage: "line.3.horizontal.decrease.circle")
+                } description: { Text("尝试其他关键词或切换处理状态。") } actions: {
+                    Button("显示全部记录") { historyQuery = ""; historyFilter = .all }
+                }
+            }
+            else { List(visibleJobs) { job in
                 VStack(alignment: .leading, spacing: 10) {
                     HStack { Image(systemName: job.state == .ready ? "checkmark.circle.fill" : job.state == .failed ? "exclamationmark.circle" : "doc.zipper").foregroundStyle(job.state == .ready ? Color.green : .secondary); Text(job.name).font(.headline); Spacer(); Text(job.state.title).foregroundStyle(.secondary) }
                     Text(job.source + (job.version.map { " · " + $0 } ?? "")).font(.caption).foregroundStyle(.secondary)
@@ -219,38 +283,53 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                         Text(ByteCountFormatter.string(fromByteCount: progress.received, countStyle: .file) + (progress.total > 0 ? " / " + ByteCountFormatter.string(fromByteCount: progress.total, countStyle: .file) : "")).font(.caption.monospacedDigit())
                     }
                     if let note = job.note { Text(note).font(.callout).foregroundStyle(job.state == .failed ? .red : .secondary).textSelection(.enabled) }
-                    HStack {
-                        if let original = model.artifact(job, clear: false) {
-                            Button("导出原始包") { export(original) }
-                            Button(job.state == .failed ? "重试解密" : "解密") { run("正在解密 IPA") { try await model.decrypt(job) } }.disabled(model.action != nil || !model.hasCredentials(for: job))
-                        }
-                        if let decrypted = model.artifact(job, clear: true) {
-                            Button("导出解密版") { export(decrypted) }; Button("网页下载") { share(decrypted) }; Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([decrypted]) }
-                        }
-                        if job.state == .failed, model.artifact(job, clear: false) == nil, let app = job.storeApp {
-                            Button("重新下载") { requestStore(app, kind: .latest, replacing: job, version: job.version) }
-                            if job.needsStoreLicense && app.price == 0 {
-                                Button("获取免费授权并重试") { requestStore(app, kind: .acquire, replacing: job) }
-                            }
-                        }
-                        if job.state == .failed, model.artifact(job, clear: false) == nil, let bundle = job.retryBetaBundle {
-                            Button("重新下载") {
-                                if model.betaConnected { run("正在重新下载测试版") { try await model.downloadBeta(job.name, bundle: bundle, replacing: job) } }
-                                else { loginBeta = true; login = true }
-                            }
-                        }
-                        if job.state == .failed {
+                    if model.artifact(job, clear: false) != nil && model.artifact(job, clear: true) == nil && !model.hasCredentials(for: job) {
+                        HStack {
+                            Label("导入匹配的 FairPlay 凭据后可解密。", systemImage: "key").foregroundStyle(.secondary)
                             Button("管理凭据") { page = .credentials }
-                            if job.flow == .store || job.flow == .beta {
-                                Button("账户设置") { loginBeta = job.flow == .beta; login = true }
-                            }
-                        }
-                        Spacer(); Button("删除", role: .destructive) { removing = job }.disabled(model.action != nil)
-                    }.controlSize(.small).disabled(model.action != nil)
+                        }.font(.callout)
+                    }
+                    historyActions(job)
                 }.padding(.vertical, 10)
             } }
+            }
         }
     }
+    private func historyActions(_ job: LocalJob) -> some View {
+        HStack(spacing: 10) {
+            if let decrypted = model.artifact(job, clear: true) {
+                Button("导出解密版", systemImage: "square.and.arrow.up") { export(decrypted) }.buttonStyle(.borderedProminent)
+            } else if model.artifact(job, clear: false) != nil {
+                if model.hasCredentials(for: job) {
+                    Button(job.state == .failed ? "重试解密" : "解密 IPA", systemImage: "lock.open") { run("正在解密 IPA") { try await model.decrypt(job) } }.buttonStyle(.borderedProminent)
+                }
+            } else if job.state == .failed, let app = job.storeApp {
+                if job.needsStoreLicense && app.price == 0 {
+                    Button("获取免费授权并重试") { requestStore(app, kind: .acquire, replacing: job) }
+                } else {
+                    Button("重新下载", systemImage: "arrow.clockwise") { requestStore(app, kind: .latest, replacing: job, version: job.version) }
+                }
+            } else if job.state == .failed, let bundle = job.retryBetaBundle {
+                Button("重新下载", systemImage: "arrow.clockwise") {
+                    if model.betaConnected { showHistory(); run("正在重新下载测试版") { try await model.downloadBeta(job.name, bundle: bundle, replacing: job) } }
+                    else { loginBeta = true; login = true }
+                }
+            }
+            Menu("更多操作") {
+                if let original = model.artifact(job, clear: false) { Button("导出原始包") { export(original) } }
+                if let decrypted = model.artifact(job, clear: true) {
+                    Button("网页下载") { share(decrypted) }
+                    Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([decrypted]) }
+                    if model.hasCredentials(for: job) { Button("重新解密") { run("正在解密 IPA") { try await model.decrypt(job) } } }
+                }
+                Button("管理凭据") { page = .credentials }
+                if job.flow == .store || job.flow == .beta { Button("账户设置") { loginBeta = job.flow == .beta; login = true } }
+                Divider()
+                Button("删除记录及文件…", role: .destructive) { removing = job }
+            }.fixedSize().accessibilityLabel("更多操作，\(job.name)")
+        }.controlSize(.regular).disabled(model.action != nil)
+    }
+    private func showHistory() { historyFilter = .all; historyQuery = ""; page = .history }
     private var deviceBusy: Bool {
         guard let action = model.action else { return false }
         return ["正在提取本机模型", "正在提取设备凭据", "正在测试设备连接", "正在扫描设备许可证", "正在提取所选许可证", "正在全部提取并去重"].contains(action)
@@ -276,7 +355,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     }
     private func performStoreRequest(_ request: PendingStoreRequest) {
         switch request.kind {
-        case .latest: page = .history; run("正在下载 IPA") { try await model.download(request.app, version: request.version, replacing: request.replacing) }
+        case .latest: showHistory(); run("正在下载 IPA") { try await model.download(request.app, version: request.version, replacing: request.replacing) }
         case .versions: run("正在读取版本") { let versions = try await model.versions(for: request.app); version = VersionSelection(app: request.app, versions: versions) }
         case .acquire: run("正在请求授权") {
             try await model.acquire(request.app)
@@ -285,15 +364,17 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
         }
     }
     private func search() { run("正在搜索") { results = []; searched = false; results = try await model.catalog(query); searched = true } }
-    private func loadTests() { run("正在读取测试目录") { tests = try await model.betaCatalog() } }
-    private func download(_ app: AppResult, version: String? = nil) { page = .history; run("正在下载 IPA") { try await model.download(app, version: version) } }
+    private func loadTests() { run("正在读取测试目录") { tests = try await model.betaCatalog(); testsLoaded = true } }
+    private func download(_ app: AppResult, version: String? = nil) { showHistory(); run("正在下载 IPA") { try await model.download(app, version: version) } }
     private func run(_ title: String, operation: @escaping @MainActor () async throws -> Void) {
-        guard model.action == nil else { return }; model.action = title
+        guard model.action == nil else { return }
+        if page == .history && (title.contains("下载") || title.contains("解密") || title.contains("导入")) { historyFilter = .all; historyQuery = "" }
+        model.action = title
         Task { defer { model.action = nil }; do { try await operation() } catch { model.message = model.friendly(error) } }
     }
     private func importIPA() {
         guard model.action == nil else { return }; let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension: "ipa") ?? .data]; panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url { page = .history; run("正在导入 IPA") { try await model.importIPA(url) } }
+        if panel.runModal() == .OK, let url = panel.url { showHistory(); run("正在导入 IPA") { try await model.importIPA(url) } }
     }
     private func export(_ url: URL) {
         let panel = NSSavePanel(); panel.nameFieldStringValue = url.lastPathComponent

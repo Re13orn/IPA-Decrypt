@@ -9,13 +9,13 @@
 | iOS | [1.0.0](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.0) | iOS 16 及以上 |
 | macOS | 1.0.3 | Apple Silicon · macOS 15 及以上 |
 
-当前发布系列为 `1.0`；macOS 为 `1.0.3`，iOS 保持 `1.0.0`，详见 [版本策略](docs/VERSIONING.md)。
+当前发布系列为 `1.0`；macOS 为 `1.0.4`，iOS 为 `1.0.1`，详见 [版本策略](docs/VERSIONING.md)。
 
 ## 界面预览
 
 ### macOS
 
-macOS 1.0.3：应用搜索、地区切换与下载操作，侧栏提供本机凭据提取及越狱设备提取入口。
+macOS 1.0.4：应用搜索、地区切换与下载操作，侧栏提供本机凭据提取及越狱设备提取入口。
 
 ![macOS 应用搜索](docs/images/macos-search.png)
 

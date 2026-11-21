@@ -59,6 +59,8 @@ import UniformTypeIdentifiers
     @State private var betas: [Beta] = []
     @State private var betaCatalogLoaded = false
     @State private var searched = false
+    @State private var historyQuery = ""
+    @State private var historyFilter: JobListFilter = .all
     private struct StoreIntent {
         enum Kind { case download, versions, license }
         let app: AppResult
@@ -237,17 +239,23 @@ import UniformTypeIdentifiers
 
     @ViewBuilder private var storeSection: some View {
         Section {
-            TextField("名称、App ID、Bundle ID 或商店链接", text: $query)
-                .accessibilityLabel("App Store 搜索")
-                .focused($enteringSearch)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .onChange(of: query) { _ in resetSearch() }
-                .onSubmit(search)
-                .disabled(busy)
-            Button("搜索 App Store", systemImage: "magnifyingglass", action: search)
-                .disabled(cleanQuery.isEmpty || busy)
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+                TextField("名称、App ID 或商店链接", text: $query)
+                    .accessibilityLabel("App Store 搜索，支持 Bundle ID")
+                    .focused($enteringSearch)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .submitLabel(.search).onChange(of: query) { _ in resetSearch() }.onSubmit(search)
+                    .disabled(busy)
+                if !query.isEmpty {
+                    Button { query = ""; enteringSearch = true } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(minWidth: 44, minHeight: 44)
+                    }.buttonStyle(.borderless).accessibilityLabel("清除搜索").disabled(busy)
+                }
+                Button(action: search) {
+                    Image(systemName: "arrow.right.circle.fill").font(.title2).frame(minWidth: 44, minHeight: 44)
+                }.buttonStyle(.borderless).accessibilityLabel("搜索 App Store").disabled(cleanQuery.isEmpty || busy)
+            }
         } footer: {
             NavigationLink { RegionPicker(model: model) } label: {
                 Label("搜索地区 · \(Storefronts.name(model.country))", systemImage: "globe")
@@ -256,10 +264,16 @@ import UniformTypeIdentifiers
 
         if !model.storeConnected {
             Section {
-                Label(model.storeNeedsReauth
-                    ? (model.canAttemptStoreOperation ? "会话已过期，下次操作时自动重新登录。" : "会话已失效，请重新登录。")
-                    : "搜索无需登录，下载需登录 App Store。", systemImage: "person.crop.circle.badge.exclamationmark")
-                Button("App Store 账户设置") { accountsFor = .store }.disabled(busy)
+                HStack(spacing: 12) {
+                    Image(systemName: "person.crop.circle.badge.exclamationmark").foregroundStyle(.secondary).accessibilityHidden(true)
+                    Text(model.storeNeedsReauth
+                        ? (model.canAttemptStoreOperation ? "下载时自动重新登录" : "登录后可继续下载")
+                        : "搜索无需登录，下载需登录账户。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    Button(model.storeNeedsReauth ? "重新登录" : "登录") { accountsFor = .store }
+                        .buttonStyle(.borderless).disabled(busy)
+                }
             }
         }
         if searched {
@@ -270,12 +284,9 @@ import UniformTypeIdentifiers
                 ForEach(results) { app in
                     HStack(spacing: 10) {
                         NavigationLink(value: AppSelection(app: app, country: model.country)) { AppListingLabel(app: app) }
-                        Menu {
-                            Button("下载最新版", systemImage: "arrow.down") { startDownload(app) }
-                            Button("选择历史版本", systemImage: "clock.arrow.circlepath") { requestVersions(app) }
-                            if app.price == 0 { Button("获取免费授权", systemImage: "person.badge.plus") { requestLicense(app, job: nil) } }
-                        } label: { Image(systemName: "arrow.down.circle").font(.title2).frame(width: 44, height: 44) }
-                        .accessibilityLabel("下载选项，\(app.trackName)").disabled(busy)
+                        Button { startDownload(app) } label: {
+                            Image(systemName: "arrow.down.circle").font(.title2).frame(width: 44, height: 44)
+                        }.buttonStyle(.borderless).accessibilityLabel("下载最新版，\(app.trackName)").disabled(busy)
                     }
                 }
             }
@@ -326,24 +337,41 @@ import UniformTypeIdentifiers
         }
     }
 
+    private var visibleJobs: [LocalJob] { model.jobs.filter { historyFilter.includes($0, query: historyQuery) } }
     private var history: some View {
         List {
+            if !model.jobs.isEmpty {
+                Section {
+                    Picker("处理状态", selection: $historyFilter) {
+                        ForEach(JobListFilter.allCases) { Text($0.rawValue).tag($0) }
+                    }.pickerStyle(.segmented)
+                }
+            }
             if let action = model.action, model.downloads.isEmpty {
                 Section { busyRow(action) }
             }
             if model.jobs.isEmpty {
                 Section {
                     Label("还没有处理记录", systemImage: "tray").foregroundStyle(.secondary)
+                    Text("下载或导入 IPA 后，可在这里查看进度、解密及导出文件。").font(.callout).foregroundStyle(.secondary)
                     Button("下载或导入 IPA") { page = 0 }
                 }
-            } else {
+            } else if visibleJobs.isEmpty {
                 Section {
-                    ForEach(model.jobs) { job in historyRow(job) }
+                    Label("没有匹配的记录", systemImage: "line.3.horizontal.decrease.circle").foregroundStyle(.secondary)
+                    Button("显示全部记录") { historyQuery = ""; historyFilter = .all }
+                }
+            } else {
+                Section("\(visibleJobs.count) 项记录") {
+                    ForEach(visibleJobs) { job in historyRow(job) }
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .searchable(text: $historyQuery, prompt: "搜索名称、版本或 Bundle ID")
+        .scrollDismissesKeyboard(.interactively)
     }
+    private func showHistory() { historyFilter = .all; historyQuery = ""; page = 1 }
 
     private func historyRow(_ job: LocalJob) -> some View {
         let original = model.artifact(job, clear: false)
@@ -558,7 +586,7 @@ import UniformTypeIdentifiers
             pendingStoreIntent = StoreIntent(app: app, kind: .download, version: version, job: job)
             accountsFor = .store; return
         }
-        page = 1
+        showHistory()
         run("正在下载 IPA") { try await model.download(app, version: version, replacing: job) }
     }
 
@@ -576,7 +604,7 @@ import UniformTypeIdentifiers
     }
 
     private func startBeta(_ title: String, bundle: String, replacing job: LocalJob? = nil) {
-        page = 1
+        showHistory()
         run("正在下载测试版") { try await model.downloadBeta(title, bundle: bundle, replacing: job) }
     }
 
@@ -610,7 +638,7 @@ import UniformTypeIdentifiers
     }
 
     private func startImport(_ url: URL, replacing job: LocalJob? = nil) {
-        page = 1
+        showHistory()
         run("正在导入 IPA") { try await model.importIPA(url, replacing: job) }
     }
 
