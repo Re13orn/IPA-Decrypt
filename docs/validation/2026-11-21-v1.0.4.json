@@ -1,0 +1,57 @@
+{
+  "release": "v1.0.4",
+  "platforms": {
+    "macos": {
+      "version": "1.0.4",
+      "build": "5",
+      "minimum_os": "15.0",
+      "architecture": "arm64",
+      "release_build": "passed",
+      "packaged_mach_o_count": 24,
+      "installed_ui": "passed"
+    },
+    "ios": {
+      "version": "1.0.1",
+      "build": "2",
+      "minimum_os": "16.0",
+      "release_device_build": "passed",
+      "unsigned_ipa_resources": "passed",
+      "arm64_simulator_build": "passed",
+      "simulator_system": "26.3",
+      "simulator_device": "iPhone 17 Pro",
+      "search_layout": "visually checked"
+    }
+  },
+  "checks": {
+    "offline_synthetic_suite": "passed",
+    "extractor_python_tests": 27,
+    "packaging_regressions": 8,
+    "shared_source_parity": "passed",
+    "source_privacy_scan": "passed; bounded scan"
+  },
+  "ui_checks": [
+    "Mac search result count, direct download button and more-options menu visible.",
+    "Mac history status filter, empty result and reset to all verified.",
+    "Mac completed records show export as primary action with secondary menu.",
+    "Mac credential source and verification sections collapsed by default.",
+    "iPhone search field, clear/search controls and inline login visible.",
+    "iPhone result metadata fits without splitting decimal ratings or version components into columns."
+  ],
+  "limits": [
+    "Full account login, download and decryption were not repeated for this UI update.",
+    "No new physical iPhone installation acceptance was performed.",
+    "No smallest-screen or accessibility text size acceptance is claimed."
+  ],
+  "macos15_runtime": {
+    "status": "passed",
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/44915894209",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "launch": "passed",
+    "python_crypto": "passed",
+    "extractor_cli": "passed",
+    "usb_helpers": "passed",
+    "enrollment_helper": "passed",
+    "scope": "Packaged app startup and offline helpers; no account or physical device acceptance"
+  }
+}

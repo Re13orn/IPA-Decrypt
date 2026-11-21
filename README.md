@@ -6,8 +6,8 @@
 
 | 平台 | 版本 | 系统要求 |
 | --- | --- | --- |
-| iOS | [1.0.0](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.0) | iOS 16 及以上 |
-| macOS | 1.0.3 | Apple Silicon · macOS 15 及以上 |
+| iOS | [1.0.1](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.4) | iOS 16 及以上 |
+| macOS | 1.0.4 | Apple Silicon · macOS 15 及以上 |
 
 当前发布系列为 `1.0`；macOS 为 `1.0.4`，iOS 为 `1.0.1`，详见 [版本策略](docs/VERSIONING.md)。
 
