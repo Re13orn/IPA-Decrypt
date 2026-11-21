@@ -93,13 +93,12 @@ enum MacEnrollment {
     }
     static func installedApps() -> [InstalledMacIOSApp] {
         let roots = [URL(fileURLWithPath: "/Applications"), FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")]
-        return roots.flatMap { root in
-            ((try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []).compactMap { url in
-                guard (try? normalizedApp(url)) != nil else { return nil }
-                return InstalledMacIOSApp(url: url, name: url.deletingPathExtension().lastPathComponent)
-            }
+        return InstalledAppDiscovery.applications(in: roots).compactMap { url in
+            guard (try? normalizedApp(url)) != nil else { return nil }
+            return InstalledMacIOSApp(url: url, name: url.deletingPathExtension().lastPathComponent)
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
+
     static func archiveInstalledApp(_ url: URL, to destination: URL) throws {
         let app = try normalizedApp(url)
         var traversalError: Error?

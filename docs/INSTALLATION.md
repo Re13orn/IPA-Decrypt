@@ -4,8 +4,8 @@
 
 | 平台 | 系统要求 | 安装附件 |
 | --- | --- | --- |
-| iOS | iOS 16 及以上 | [IPA-Decrypt-iOS-1.0.3-unsigned.ipa](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.6/IPA-Decrypt-iOS-1.0.3-unsigned.ipa) |
-| macOS | Apple Silicon · macOS 15 及以上 | `IPA-Decrypt-macOS-1.0.6-arm64.dmg` |
+| iOS | iOS 16 及以上 | [IPA-Decrypt-iOS-1.0.3-unsigned.ipa](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.7/IPA-Decrypt-iOS-1.0.3-unsigned.ipa) |
+| macOS | Apple Silicon · macOS 15 及以上 | `IPA-Decrypt-macOS-1.0.7-arm64.dmg` |
 
 从 [Releases](https://github.com/Re13orn/IPA-Decrypt/releases) 下载附件与对应的 `SHA256SUMS`，在下载目录执行：
 

@@ -21,11 +21,12 @@ import UniformTypeIdentifiers
                 Label("从这台 Mac 提取 FairPlay 模型", systemImage: "desktopcomputer").font(.title2.bold())
                 Text("先从 Mac App Store 安装并打开一个 iPhone / iPad App，再选择它提取模型。").foregroundStyle(.secondary)
             }
-            Section("1. 选择已安装的应用") {
+            Section("1. 选择已安装的 iPhone / iPad 应用") {
                 HStack {
                     Button("刷新列表", systemImage: "arrow.clockwise") { refresh() }
                     Button("选择其他应用…", systemImage: "folder") { chooseApp() }
                 }.disabled(busy)
+                Text("已找到 \(apps.count) 个带许可证的应用；包含应用目录的子文件夹。").font(.caption).foregroundStyle(.secondary)
                 if apps.isEmpty {
                     Text("未找到带有 FairPlay 许可证的 iOS App。请从原生 Mac App Store 安装并打开一个 iPhone 或 iPad App。").foregroundStyle(.secondary)
                 } else {

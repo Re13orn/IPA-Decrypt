@@ -5,6 +5,8 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/.build-work/tests"
 mkdir -p "$out"
 mac="$root/apps/macos"
+swiftc -parse-as-library "$mac/App/InstalledAppDiscovery.swift" "$mac/Tools/Tests/InstalledAppDiscoveryTests.swift" -o "$out/installed-app-discovery"
+"$out/installed-app-discovery"
 python3 "$root/scripts/check-source.py"
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$mac/Tools/Tests" -p test_extractor.py
 swiftc "$mac/App/StoreSessionRecovery.swift" "$mac/Tools/Tests/StoreSessionRecoveryTests.swift" -o "$out/store-recovery"
