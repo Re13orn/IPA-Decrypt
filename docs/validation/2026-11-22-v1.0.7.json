@@ -1,0 +1,35 @@
+{
+  "release": "v1.0.7",
+  "macos": {
+    "version": "1.0.7",
+    "build": "8",
+    "minimum_os": "15.0",
+    "architecture": "arm64",
+    "release_build": "passed",
+    "packaged_mach_o_count": 24,
+    "pinned_runtime_resources": 7
+  },
+  "ios": {
+    "version": "1.0.3",
+    "build": "4",
+    "status": "unchanged; identical to v1.0.6 release asset"
+  },
+  "checks": {
+    "offline_synthetic_suite": "passed",
+    "nested_app_discovery": "passed; nested apps included, app bundle contents and hidden directories excluded, overlapping roots deduplicated",
+    "local_ui": "passed; previously omitted nested app appears and detected count is 3",
+    "release_bundle_checks": "passed",
+    "candidate_asset_hashes": "passed"
+  },
+  "macos15_runtime": {
+    "status": "passed",
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/44956743837",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "scope": "Packaged startup and offline helpers; no real account or device extraction acceptance"
+  },
+  "limits": [
+    "No real credential extraction or administrator authorization repeated.",
+    "A detected license file does not establish that extraction will succeed."
+  ]
+}
