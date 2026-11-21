@@ -47,3 +47,12 @@ struct CredentialGroup: Identifiable {
         return groups
     }
 }
+
+enum CredentialRecords {
+    static func orderedKeys(_ records: [FairPlayCredential], preferredOwner: String?) -> [Data] {
+        let valid = records.filter { !$0.isEnrollment && $0.data.count == 16 }
+        let ordered = valid.filter { $0.owner == preferredOwner || $0.owner == nil } + valid.filter { $0.owner != preferredOwner && $0.owner != nil }
+        var seen = Set<Data>()
+        return ordered.compactMap { seen.insert($0.data).inserted ? $0.data : nil }
+    }
+}

@@ -72,6 +72,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var removing: LocalJob?
     @State private var pendingStoreRequest: PendingStoreRequest?
     @State private var incomingCredential: URL?
+    @State private var selectedCredential: UUID?
 
     var body: some View {
         NavigationSplitView {
@@ -99,9 +100,9 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 case .store: storeView
                 case .beta: betaView
                 case .history: historyView
-                case .credentials: MacCredentials(model: model, incomingFile: $incomingCredential)
-                case .enrollment: MacEnrollmentView(model: model)
-                case .device: CredentialExtractionView(model: model)
+                case .credentials: MacCredentials(model: model, incomingFile: $incomingCredential, selected: $selectedCredential, extractLocal: { page = .enrollment }, extractDevice: { page = .device }, useCredentials: continueWithCredentials)
+                case .enrollment: MacEnrollmentView(model: model, viewCredential: openCredential, useCredentials: continueWithCredentials)
+                case .device: CredentialExtractionView(model: model, viewCredential: openCredential, useCredentials: continueWithCredentials)
                 }
             }.navigationTitle((page ?? .store).rawValue)
             .toolbar {
@@ -338,6 +339,8 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
             }.fixedSize().accessibilityLabel("更多操作，\(job.name)")
         }.controlSize(.regular).disabled(model.action != nil)
     }
+    private func openCredential(_ id: UUID) { selectedCredential = id; page = .credentials }
+    private func continueWithCredentials() { if model.jobs.isEmpty { page = .store } else { showHistory() } }
     private func showHistory() { historyFilter = .all; historyQuery = ""; page = .history }
     private var deviceBusy: Bool {
         guard let action = model.action else { return false }

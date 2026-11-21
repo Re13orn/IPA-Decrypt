@@ -76,6 +76,7 @@ import UniformTypeIdentifiers
     @State private var showCredentials = false
     @State private var credentialOwner: String?
     @State private var credentialImport: URL?
+    @State private var credentialJob: LocalJob?
     @State private var versionApp: AppResult?
     @State private var sharing: ShareFile?
     @State private var webSharing: ShareFile?
@@ -122,8 +123,8 @@ import UniformTypeIdentifiers
                                     set: { if !$0 { model.finishCode(nil) } }), onDismiss: { model.finishCode(nil) }) {
             VerificationSheet(model: model)
         }
-        .sheet(isPresented: $showCredentials, onDismiss: { credentialImport = nil }) {
-            CredentialsSheet(model: model, owner: credentialOwner, incomingFile: credentialImport)
+        .sheet(isPresented: $showCredentials, onDismiss: { credentialImport = nil; credentialJob = nil }) {
+            CredentialsSheet(model: model, owner: credentialOwner, incomingFile: credentialImport, targetJob: credentialJob, onUse: { if model.jobs.isEmpty { page = 0 } else { showHistory() } })
         }
         .sheet(item: $versionApp, onDismiss: presentPendingCredential) { app in
             VersionPicker(model: model, app: app) { version in
@@ -412,7 +413,7 @@ import UniformTypeIdentifiers
                         if let original {
                             Button("导出原始包", systemImage: "doc.zipper") { sharing = ShareFile(url: original) }
                             if job.state != .ready {
-                                Button("管理凭据", systemImage: "key") { openCredentials(owner(for: job)) }
+                                Button("管理凭据", systemImage: "key") { openCredentials(owner(for: job), job: job) }
                             }
                         } else if job.state == .failed {
                             if canAcquire {
@@ -454,7 +455,7 @@ import UniformTypeIdentifiers
                             run("正在解密") { try await model.decrypt(job) }
                         }
                     } else {
-                        recordAction("导入 FairPlay 凭据", "key") { openCredentials(owner(for: job)) }
+                        recordAction("导入 FairPlay 凭据", "key") { openCredentials(owner(for: job), job: job) }
                     }
                 } else if job.state == .failed {
                     if canAcquire, let app = job.storeApp {
@@ -562,7 +563,8 @@ import UniformTypeIdentifiers
         return job.credentialOwner ?? model.activeProfile(beta: job.flow == .beta)?.owner
     }
 
-    private func openCredentials(_ owner: String?) {
+    private func openCredentials(_ owner: String?, job: LocalJob? = nil) {
+        credentialJob = job
         credentialOwner = owner
         showCredentials = true
     }
@@ -1142,11 +1144,14 @@ private struct SharedIPA: UIViewControllerRepresentable {
     @Environment(\.dismiss) private var dismiss
     @State var owner: String?
     var incomingFile: URL? = nil
+    var targetJob: LocalJob? = nil
+    var onUse: (() -> Void)? = nil
     @State private var importedFile: URL?
     @State private var reading = false
     @State private var hex = ""
     @State private var revealHex = false
     @State private var importing = false
+    @State private var showImport = false
     @State private var status: String?
     @State private var failed = false
     @State private var query = ""
@@ -1158,34 +1163,33 @@ private struct SharedIPA: UIViewControllerRepresentable {
     var body: some View {
         NavigationStack {
             Form {
+                if let targetJob {
+                    Section("用于此 IPA") {
+                        Label(targetJob.name, systemImage: "doc.zipper").font(.headline)
+                        Text("保存后返回处理记录继续解密。可用性以该 IPA 的许可证校验为准。").font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+                if groups.isEmpty {
+                    Section("获取凭据") {
+                        Text("在 Mac 版连接越狱设备，提取后导出 credential.bin，再传到 iPhone；也可复制 32 位十六进制文本。")
+                            .font(.callout)
+                        Text("Mac 本机模型仅供 Mac 版使用，不能导入这里。").font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
                 Section {
-                    Picker("账户标签", selection: $owner) {
-                        Text("未绑定").tag(nil as String?)
-                        if let owner, !model.credentialOwners.contains(owner) { Text(owner).tag(Optional(owner)) }
-                        ForEach(model.credentialOwners, id: \.self) { Text($0).tag(Optional($0)) }
-                    }
-                    if let incomingFile {
-                        Text("已收到文件：\(incomingFile.lastPathComponent)").font(.footnote)
-                        Button("导入收到的凭据", systemImage: "key") { importCredential(incomingFile) }
-                            .disabled(reading || importedFile == incomingFile)
-                    }
-                    Button("选择 credential.bin", systemImage: "doc.badge.plus") { importing = true }
-                        .disabled(reading || importing)
+                    if groups.isEmpty || incomingFile != nil { importFields }
+                    else { DisclosureGroup("导入其他凭据", isExpanded: $showImport) { importFields } }
                     if reading { ProgressView("正在读取并校验…") }
-                    HStack {
-                        Group {
-                            if revealHex { TextField("32 位十六进制凭据", text: $hex) }
-                            else { SecureField("32 位十六进制凭据", text: $hex) }
-                        }.textInputAutocapitalization(.never).autocorrectionDisabled()
-                        Button { revealHex.toggle() } label: { Image(systemName: revealHex ? "eye.slash" : "eye") }
-                            .accessibilityLabel(revealHex ? "隐藏十六进制" : "显示十六进制")
-                    }
-                    Button("保存十六进制凭据") { importHex() }
-                        .disabled(reading || hex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     if let status { Text(status).font(.footnote).foregroundStyle(failed ? Color.red : Color.secondary) }
                 } header: { Text("导入凭据") } footer: {
-                    Text("credential.bin 为 16 字节，等价于 32 位十六进制字符。账户标签可手动设置，不代表来源已经验证；相同内容只显示一份，保留各账户标签。")
+                    Text("支持 16 字节 credential.bin 或 32 位十六进制文本。保存后自动按 IPA 许可证匹配，账户标签仅用于管理。")
                 }
+                    if !groups.isEmpty, let onUse {
+                        Section {
+                            Button(model.jobs.isEmpty ? "下载或导入 IPA" : "选择 IPA 解密", systemImage: "lock.open") { dismiss(); onUse() }
+                                .disabled(reading || model.verifyingCredentials)
+                        } footer: { Text("已有原始 IPA 可继续解密；新下载或导入的 IPA 会自动尝试匹配凭据。") }
+                    }
                 Section {
                     TextField("搜索名称、账户标签或指纹", text: $query)
                     ForEach(visible) { group in
@@ -1200,7 +1204,7 @@ private struct SharedIPA: UIViewControllerRepresentable {
                             }.padding(.vertical, 3)
                         }
                     }
-                    if groups.isEmpty { Text("尚无凭据，可导入 Mac 提取的 credential.bin 或粘贴十六进制。").foregroundStyle(.secondary) }
+                    if groups.isEmpty { Text("导入后会在这里显示。").foregroundStyle(.secondary) }
                     else if visible.isEmpty { Text("没有匹配的凭据。").foregroundStyle(.secondary) }
                 } header: { Text("已保存 \(groups.count) 份不同凭据") }
                 if !groups.isEmpty {
@@ -1223,13 +1227,43 @@ private struct SharedIPA: UIViewControllerRepresentable {
         }
         .onDisappear { hex = ""; revealHex = false }
     }
+    private var importFields: some View {
+        Group {
+                    Picker("账户标签", selection: $owner) {
+                        Text("未绑定").tag(nil as String?)
+                        if let owner, !model.credentialOwners.contains(owner) { Text(owner).tag(Optional(owner)) }
+                        ForEach(model.credentialOwners, id: \.self) { Text($0).tag(Optional($0)) }
+                    }
+                    if let incomingFile {
+                        Text("已收到文件：\(incomingFile.lastPathComponent)").font(.footnote)
+                        Button("导入收到的凭据", systemImage: "key") { importCredential(incomingFile) }
+                            .disabled(reading || importedFile == incomingFile)
+                    }
+                    Button("选择 credential.bin", systemImage: "doc.badge.plus") { importing = true }
+                        .disabled(reading || importing)
+                    HStack {
+                        Group {
+                            if revealHex { TextField("32 位十六进制凭据", text: $hex) }
+                            else { SecureField("32 位十六进制凭据", text: $hex) }
+                        }.textInputAutocapitalization(.never).autocorrectionDisabled()
+                        Button { revealHex.toggle() } label: { Image(systemName: revealHex ? "eye.slash" : "eye") }
+                            .accessibilityLabel(revealHex ? "隐藏十六进制" : "显示十六进制")
+                    }
+                    Button("保存十六进制凭据") { importHex() }
+                        .disabled(reading || hex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
     private func imported(_ id: UUID, duplicate: Bool) async {
         failed = false
         status = duplicate ? "相同凭据已存在，已保留账户标签。" : "凭据已保存。"
         guard !model.verifyingCredentials, let data = model.credentials.first(where: { $0.id == id })?.data else { return }
+        guard model.jobs.contains(where: { model.artifact($0, clear: false) != nil }) else {
+            status = "凭据已保存，尚无原始 IPA 可供校验。"
+            return
+        }
         do {
             let count = try await model.verifyCredentials(data: data)
-            status = count > 0 ? "凭据已保存，已校验 \(count) 条本机 IPA 许可证。" : "凭据已保存，当前本机 IPA 尚无匹配许可证。"
+            status = count > 0 ? "凭据已保存，已校验 \(count) 条本机 IPA 许可证。" : model.jobs.contains(where: { model.artifact($0, clear: false) != nil }) ? "凭据已保存，现有 IPA 暂未匹配。可导入其他凭据或更换 IPA。" : "凭据已保存。下载或导入原始 IPA 后自动匹配。"
         } catch { status = "凭据已保存。" + model.friendly(error) }
     }
     private func importHex() {

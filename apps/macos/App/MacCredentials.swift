@@ -5,7 +5,10 @@ import UniformTypeIdentifiers
 @MainActor struct MacCredentials: View {
     @ObservedObject var model: LocalLab
     @Binding var incomingFile: URL?
-    @State private var selected: UUID?
+    @Binding var selected: UUID?
+    let extractLocal: () -> Void
+    let extractDevice: () -> Void
+    let useCredentials: () -> Void
     @State private var query = ""
     @State private var importing = false
     @State private var pendingFile: URL?
@@ -23,13 +26,28 @@ import UniformTypeIdentifiers
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(model.credentials.count) 个凭据 · \(Set(model.credentials.compactMap(\.owner)).count) 个已绑定 Apple ID").font(.headline)
-                    Text("按账户管理，每条凭据都可单独查看、改绑、导出或删除。").font(.caption).foregroundStyle(.secondary)
+                    Text("\(model.credentials.count) 个凭据 · \(Set(model.credentials.compactMap(\.owner)).count) 个账户标签").font(.headline)
+                    Text("解密时自动按许可证匹配；账户标签用于归类。").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("导入凭据", systemImage: "plus") { pendingFile = nil; importing = true }.buttonStyle(.borderedProminent)
+                Menu("获取凭据") {
+                    Button("从这台 Mac 提取模型", systemImage: "desktopcomputer", action: extractLocal)
+                    Button("从越狱设备提取凭据", systemImage: "iphone.and.arrow.forward", action: extractDevice)
+                }
+                if !model.credentials.isEmpty { Button(model.jobs.isEmpty ? "下载或导入 IPA" : "选择 IPA 解密", systemImage: "lock.open", action: useCredentials) }
+                Button("导入已有凭据", systemImage: "plus") { pendingFile = nil; importing = true }.buttonStyle(.borderedProminent)
             }.padding()
             Divider()
+            if model.credentials.isEmpty {
+                ContentUnavailableView {
+                    Label("获取用于解密的凭据", systemImage: "key")
+                } description: {
+                    Text("这台 Mac 已安装商店中的 iPhone / iPad App，可尝试本机提取；有越狱设备可提取 credential.bin。")
+                } actions: {
+                    Button("从本机提取", action: extractLocal).buttonStyle(.borderedProminent)
+                    Button("从越狱设备提取", action: extractDevice)
+                }
+            } else {
             HSplitView {
                 VStack(spacing: 0) {
                     TextField("搜索 Apple ID、名称或指纹", text: $query).textFieldStyle(.roundedBorder).padding(12)
@@ -68,10 +86,11 @@ import UniformTypeIdentifiers
                     }
                 }.frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
             }
+            }
             if let status { Divider(); Text(status).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(10) }
         }
         .sheet(isPresented: $importing, onDismiss: { pendingFile = nil }) {
-            CredentialImportSheet(model: model, incoming: pendingFile) { id in selected = id; status = "凭据已保存。" }
+            CredentialImportSheet(model: model, incoming: pendingFile) { id in selected = id; query = ""; status = "凭据已保存。" }
         }
         .onAppear { if selected == nil { selected = model.credentials.first?.id }; receiveIncoming() }
         .onChange(of: incomingFile) { receiveIncoming() }
@@ -244,7 +263,7 @@ import UniformTypeIdentifiers
             Divider()
             Text("或粘贴 32 位十六进制凭据").font(.headline)
             SecureField("支持 0x 前缀与空格", text: $hex).textFieldStyle(.roundedBorder)
-            Text("这是 credential.bin 的文本表示，不是 Apple ID 密码，也不是证书。16 字节对应 32 个十六进制字符。").font(.caption).foregroundStyle(.secondary)
+            Text("credential.bin 为 16 字节，对应 32 个十六进制字符。Mac 本机模型请通过文件导入。").font(.caption).foregroundStyle(.secondary)
             if let problem { Text(problem).foregroundStyle(.red) }
             if reading { ProgressView("正在读取…") }
             HStack {

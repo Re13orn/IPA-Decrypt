@@ -6,10 +6,10 @@
 
 | 平台 | 版本 | 系统要求 |
 | --- | --- | --- |
-| iOS | [1.0.2](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.5) | iOS 16 及以上 |
-| macOS | 1.0.5 | Apple Silicon · macOS 15 及以上 |
+| iOS | [1.0.3](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.6) | iOS 16 及以上 |
+| macOS | 1.0.6 | Apple Silicon · macOS 15 及以上 |
 
-当前发布系列为 `1.0`；macOS 为 `1.0.5`，iOS 为 `1.0.2`，详见 [版本策略](docs/VERSIONING.md)。
+当前发布系列为 `1.0`；macOS 为 `1.0.6`，iOS 为 `1.0.3`，详见 [版本策略](docs/VERSIONING.md)。
 
 ## 界面预览
 
@@ -57,6 +57,16 @@ macOS 1.0.4：应用搜索、地区切换与下载操作，侧栏提供本机凭
 - **iOS**：下载未签名 IPA，使用适用于目标设备的有效签名后安装。
 
 Mac 当前采用 ad-hoc 签名，未公证。文件校验、系统安装提示及首次使用步骤见 [安装指南](docs/INSTALLATION.md)。
+
+## 凭据获取与使用
+
+| 当前条件 | 获取方式 | 使用位置 |
+| --- | --- | --- |
+| Mac 已安装商店中的 iPhone / iPad App | FairPlay 凭据 → 获取凭据 → 从这台 Mac 提取模型 | Mac 版 |
+| 有开启 SSH 的越狱设备 | 连接并测试 → 全部提取并去重 → 自动保存 | Mac 版；导出 credential.bin 后可传到 iPhone |
+| 已有 credential.bin 或十六进制文本 | 导入文件，或粘贴 32 位十六进制凭据 | Mac 与 iPhone 版 |
+
+保存后，从凭据页进入“选择 IPA 解密”；已有原始文件在处理记录中继续，新下载或导入的 IPA 会自动尝试匹配。账户标签用于管理，实际可用性由许可证校验决定。详见[凭据使用指南](docs/CREDENTIALS.md)。
 
 ## 多账户使用
 

@@ -38,6 +38,8 @@ enum ExtractorProcess {
 
 @MainActor struct CredentialExtractionView: View {
     @ObservedObject var model: LocalLab
+    let viewCredential: (UUID) -> Void
+    let useCredentials: () -> Void
     @State private var devices: [JailbreakDevice] = []
     @AppStorage("device-selected-udid") private var selected = ""
     @AppStorage("device-connection-mode") private var mode = "usb"
@@ -83,9 +85,15 @@ enum ExtractorProcess {
         Form {
             Section {
                 Label("从越狱设备提取凭据", systemImage: "iphone.and.arrow.forward").font(.title2.bold())
-                Text("通过 USB 或网络连接已越狱的 iPhone 或 iPad，并确保可通过 root 登录、sudo 或 su 取得 root 权限。设备上需安装目标账户获取的 App Store App。提取期间会临时运行关联 App 的副本，完成后清理设备临时文件。").foregroundStyle(.secondary)
+                Text("连接已越狱设备并测试 SSH，再点“全部提取并去重”。设备上需安装 App Store App。").foregroundStyle(.secondary)
             }
-            Section("连接方式") {
+            Section {
+                DisclosureGroup("连接要求") {
+                    Text("设备需已越狱并开启 SSH。USB 连接仍需 SSH 认证；也可使用 IP 地址连接。")
+                    Text("设备上需安装 App Store App。提取期间会临时运行关联应用，完成后清理临时文件。")
+                }.font(.callout).foregroundStyle(.secondary)
+            }
+            Section("1. 连接越狱设备") {
                 Picker("连接", selection: $mode) {
                     Text("USB 设备").tag("usb")
                     Text("IP / 主机名").tag("network")
@@ -106,34 +114,7 @@ enum ExtractorProcess {
                 TextField("设备 SSH 端口", text: $port).frame(maxWidth: 250)
                 Text("默认 22；部分设备使用 44。USB 方式会自动建立和关闭转发。").font(.caption).foregroundStyle(.secondary)
             }.disabled(busy || testing)
-            Section("可选：用账户 IPA 推荐许可证") {
-                Picker("目标 Apple ID", selection: $owner) {
-                    Text("未选择账户 / 外部 IPA").tag(nil as String?)
-                    ForEach(model.credentialOwners, id: \.self) { Text($0).tag(Optional($0)) }
-                }
-                if !accountJobs.isEmpty {
-                    Picker("该账户下载的原始 IPA", selection: $targetJob) {
-                        Text("请选择 / 使用外部 IPA").tag(nil as UUID?)
-                        ForEach(accountJobs) { Text($0.name + ($0.version.map { " · " + $0 } ?? "")).tag(Optional($0.id)) }
-                    }
-                } else {
-                    Text("该账户暂无本机原始 IPA。仍可选择手机上的许可证提取，结果保存为未绑定。").font(.caption).foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text(license?.lastPathComponent ?? "未选择目标 IPA（仍可扫描并提取设备许可证）").foregroundStyle(.secondary)
-                    Spacer()
-                    Button("选择外部 IPA…") { if let url = choose(ipa: true) { externalSource = true; targetJob = nil; inspect(url) } }
-                }
-                if inspecting { ProgressView("正在读取目标许可证…") }
-                if !choices.isEmpty {
-                    Picker("目标许可证", selection: $member) {
-                        ForEach(choices) { Text($0.member + " · user " + $0.user + " / key " + $0.key).tag($0.member) }
-                    }
-                    Text("匹配此 IPA 的设备许可证会标为推荐；仍需你从设备列表中选择。").font(.caption).foregroundStyle(.secondary)
-                    Text(targetJob == nil ? "外部 IPA 的下载账户未知，结果保存为未绑定。" : "保存归属依据该任务的下载账户；不会用界面标签推测许可证账户。").font(.caption).foregroundStyle(.secondary)
-                }
-            }.disabled(busy || testing)
-            Section("SSH 认证") {
+            Section("2. 测试连接") {
                 Toggle("自动尝试常见账户组合", isOn: $automaticAuthentication)
                 Text("开启后只尝试 root/alpine 与 mobile/123456；关闭后使用下方填写的信息。").font(.caption).foregroundStyle(.secondary)
                 TextField("SSH 用户名", text: $username)
@@ -166,9 +147,39 @@ enum ExtractorProcess {
                     if tested == signature { Label("连接已验证", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
                 }
             }.disabled(busy || testing)
-            Section("提取与凭据结果") {
+            Section {
+                DisclosureGroup("为指定 IPA 匹配来源（可选）") {
+                Picker("目标 Apple ID", selection: $owner) {
+                    Text("未选择账户 / 外部 IPA").tag(nil as String?)
+                    ForEach(model.credentialOwners, id: \.self) { Text($0).tag(Optional($0)) }
+                }
+                if !accountJobs.isEmpty {
+                    Picker("该账户下载的原始 IPA", selection: $targetJob) {
+                        Text("请选择 / 使用外部 IPA").tag(nil as UUID?)
+                        ForEach(accountJobs) { Text($0.name + ($0.version.map { " · " + $0 } ?? "")).tag(Optional($0.id)) }
+                    }
+                } else {
+                    Text("该账户暂无本机原始 IPA。仍可选择手机上的许可证提取，结果保存为未绑定。").font(.caption).foregroundStyle(.secondary)
+                }
                 HStack {
-                    Button(busy ? "正在处理…" : "扫描并合并重复凭据", systemImage: "arrow.clockwise") { scan() }
+                    Text(license?.lastPathComponent ?? "未选择目标 IPA（仍可扫描并提取设备许可证）").foregroundStyle(.secondary)
+                    Spacer()
+                    Button("选择外部 IPA…") { if let url = choose(ipa: true) { externalSource = true; targetJob = nil; inspect(url) } }
+                }
+                if inspecting { ProgressView("正在读取目标许可证…") }
+                if !choices.isEmpty {
+                    Picker("目标许可证", selection: $member) {
+                        ForEach(choices) { Text($0.member + " · user " + $0.user + " / key " + $0.key).tag($0.member) }
+                    }
+                    Text("匹配此 IPA 的设备许可证会标为推荐；仍需你从设备列表中选择。").font(.caption).foregroundStyle(.secondary)
+                    Text(targetJob == nil ? "外部 IPA 的下载账户未知，结果保存为未绑定。" : "保存归属依据该任务的下载账户；不会用界面标签推测许可证账户。").font(.caption).foregroundStyle(.secondary)
+                }
+                }
+            }.disabled(busy || testing)
+            Section("3. 提取并保存") {
+                Text("全部提取会自动扫描、提取并合并相同内容；扫描许可证用于先查看来源。已确认的凭据会自动保存。").font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button(busy ? "正在处理…" : "扫描许可证", systemImage: "arrow.clockwise") { scan() }
                         .disabled(busy || testing || !validConnection)
                     Text("\(confirmedGroups.count) 个已确认凭据 · \(pendingSupported.count) 条待识别 · \(unsupportedCount) 条暂不支持").foregroundStyle(.secondary)
                     if busy { ProgressView().controlSize(.small) }
@@ -180,7 +191,7 @@ enum ExtractorProcess {
                         Button(stopRequested ? "将在当前项结束后停止" : "完成当前项后停止") { stopRequested = true }.disabled(stopRequested)
                     }
                 }
-                Text("自动处理全部可提取项；已有凭据可校验通过的来源直接复用。结果按实际 16 字节内容去重，失败项单独显示。").font(.caption).foregroundStyle(.secondary)
+                if !failures.isEmpty { Text("未完成项可单独重试。").font(.caption).foregroundStyle(.secondary) }
                 if batchRunning { ProgressView(value: Double(batchProgress), total: Double(max(batchTotal, 1))) }
                 TextField("搜索 App、Bundle ID 或许可证 user / key", text: $search)
                 if !installed.isEmpty {
@@ -215,11 +226,13 @@ enum ExtractorProcess {
                         }
                     }.frame(height: 300)
                 } else {
-                    Text("相同凭据校验通过的许可证合并显示。未识别的保留单项，不会仅凭 user/key 相同就合并。").foregroundStyle(.secondary)
+                    Text(installed.isEmpty ? "尚未扫描设备许可证。" : "未找到匹配项，请修改搜索词。").foregroundStyle(.secondary)
                 }
                 if let record = selectedCredential {
                     HStack {
-                        Text("已选择凭据：" + record.displayName)
+                        Text("已保存：" + record.displayName)
+                        Button("查看凭据") { viewCredential(record.id) }.disabled(busy || testing)
+                        Button("选择 IPA 解密", action: useCredentials).disabled(busy || testing)
                         Button("导出 credential.bin…") { exportData(record.data) }
                         Button("复制十六进制") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(record.hex, forType: .string) }
                     }
@@ -231,13 +244,16 @@ enum ExtractorProcess {
                         }
                     }
                 }
-                Button("重新提取所选来源", systemImage: "key.fill") { extract() }
-                    .buttonStyle(.borderedProminent).disabled(busy || testing || selectedInstalled == nil || scannedSignature != signature)
                 if let item = selectedInstalled {
+                    Button("重新提取所选来源", systemImage: "key.fill") { extract() }
+                        .buttonStyle(.borderedProminent).disabled(busy || testing || scannedSignature != signature)
                     Text("已选择：" + item.appName + " · user " + item.user + " / key " + item.key).textSelection(.enabled)
                     Text(recommended(item) && targetJob != nil ? "校验目标 IPA 成功后，保存至其下载账户。" : "未确认下载账户，结果保存为未绑定。").font(.caption).foregroundStyle(.secondary)
                 }
                 if let status { Label(status, systemImage: succeeded ? "checkmark.circle.fill" : "info.circle").foregroundStyle(succeeded ? Color.green : .secondary).textSelection(.enabled) }
+                if !confirmedGroups.isEmpty && selectedCredential == nil {
+                    Button("选择 IPA 解密", systemImage: "lock.open", action: useCredentials).disabled(busy || testing)
+                }
                 if let output { HStack { Button("导出 credential.bin…") { export(output) }; Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([output]) } } }
             }
         }.formStyle(.grouped).onDisappear { if let snapshotFolder, !busy { try? FileManager.default.removeItem(at: snapshotFolder) }; revealPassword = false; revealRootPassword = false; if !busy && !testing { password = ""; rootPassword = "" } }.disabled(model.action != nil && !busy && !testing).task { if devices.isEmpty { discover() }; if license == nil { owner = model.activeProfile(beta: false)?.owner ?? model.activeProfile(beta: true)?.owner; selectAccountTarget() } }
@@ -508,7 +524,7 @@ enum ExtractorProcess {
                     batchProgress = installed.filter { $0.supported && ($0.credentialMatch != nil || plan.attempted.contains($0.id)) }.count
                 }
                 succeeded = pendingSupported.isEmpty
-                status = (stopRequested ? "已停止，保留已确认结果。" : "批量处理结束。") + "已确认 \(confirmedGroups.count) 个不同凭据；未完成 \(pendingSupported.count) 条，暂不支持 \(unsupportedCount) 条。请选择上方已确认凭据导出。"
+                status = (stopRequested ? "已停止，保留已确认结果。" : "批量处理结束。") + "已确认 \(confirmedGroups.count) 个不同凭据；未完成 \(pendingSupported.count) 条，暂不支持 \(unsupportedCount) 条。" + (confirmedGroups.isEmpty ? "本次未保存凭据。" : "凭据已保存，可在处理记录中用于解密。")
             } catch { status = model.friendly(error) }
         }
     }

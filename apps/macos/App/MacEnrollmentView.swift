@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 
 @MainActor struct MacEnrollmentView: View {
     @ObservedObject var model: LocalLab
+    let viewCredential: (UUID) -> Void
+    let useCredentials: () -> Void
+    @State private var savedID: UUID?
     @State private var apps: [InstalledMacIOSApp] = []
     @State private var selected: String?
     @State private var owner: String?
@@ -16,9 +19,9 @@ import UniformTypeIdentifiers
         Form {
             Section {
                 Label("从这台 Mac 提取 FairPlay 模型", systemImage: "desktopcomputer").font(.title2.bold())
-                Text("在原生 Mac App Store 登录，安装并打开一个 iPhone 或 iPad App，再从下方选择该应用。提取会读取本机注册状态，并用所选应用完整验证恢复的模型，无需越狱设备。").foregroundStyle(.secondary)
+                Text("先从 Mac App Store 安装并打开一个 iPhone / iPad App，再选择它提取模型。").foregroundStyle(.secondary)
             }
-            Section("选择验证应用") {
+            Section("1. 选择已安装的应用") {
                 HStack {
                     Button("刷新列表", systemImage: "arrow.clockwise") { refresh() }
                     Button("选择其他应用…", systemImage: "folder") { chooseApp() }
@@ -38,21 +41,30 @@ import UniformTypeIdentifiers
                     }
                 }
             }
-            Section("保存与提取") {
+            Section("2. 提取并验证") {
                 Picker("归属 Apple ID（管理标签）", selection: $owner) {
                     Text("未绑定").tag(nil as String?)
                     ForEach(model.credentialOwners, id: \.self) { Text($0).tag(Optional($0)) }
                 }.disabled(busy)
-                Text("首次读取系统注册文件时会弹出 macOS 管理员授权窗口。管理员密码由系统处理，App 不接收或保存。原始快照及临时验证文件在本次操作结束后清理，只保存通过验证的模型。").font(.caption).foregroundStyle(.secondary)
+                Text("系统会请求管理员授权，用于读取本机注册信息；验证通过后保存模型。").font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button("提取并验证模型", systemImage: "key.fill") { extract() }.buttonStyle(.borderedProminent).disabled(busy || selectedApp == nil || model.action != nil)
                     if busy { ProgressView().controlSize(.small); Text("正在提取并验证…").font(.callout); Button("取消") { task?.cancel() } }
                 }
                 if let status { Text(status).foregroundStyle(failed ? Color.red : .secondary).textSelection(.enabled) }
             }
+            if let savedID {
+                Section("3. 用于解密") {
+                    HStack {
+                        Button(model.jobs.isEmpty ? "下载 IPA" : "选择 IPA 解密", systemImage: "lock.open", action: useCredentials).buttonStyle(.borderedProminent)
+                        Button("查看已保存模型") { viewCredential(savedID) }
+                    }
+                    Text("下载或导入 IPA 后自动尝试匹配；已有文件可在处理记录中继续解密。").font(.caption).foregroundStyle(.secondary)
+                }
+            }
             Section("使用范围") {
-                Text("恢复的模型可解密与本机商店注册状态及许可证匹配的 IPA。相同 Apple ID 并不保证所有下载来源都匹配；下载后会按许可证实际校验。")
-                Text("模型可在“FairPlay 凭据”中查看、改名、设置管理归属、导出或删除。已有 credential.bin 仍可正常使用。")
+                Text("适用于与这台 Mac 注册状态匹配的 IPA；解密时会再次校验许可证。")
+                Text("本机模型仅供 Mac 版使用。传到 iPhone 使用的 credential.bin，需从越狱设备提取。")
             }.foregroundStyle(.secondary)
         }.formStyle(.grouped)
         .onAppear { refresh() }
@@ -72,7 +84,7 @@ import UniformTypeIdentifiers
         guard let app = selectedApp, model.action == nil else { return }
         do {
             let resources = try MacEnrollment.resources(), label = owner
-            failed = false; status = nil; model.action = "正在提取本机模型"
+            failed = false; status = nil; savedID = nil; model.action = "正在提取本机模型"
             let operation = Task.detached(priority: .userInitiated) { try MacEnrollment.recover(app: app, resources: resources) }
             task = operation
             Task {
@@ -80,8 +92,8 @@ import UniformTypeIdentifiers
                 do {
                     let result = try await operation.value
                     if operation.isCancelled { throw CancellationError() }
-                    _ = try model.addEnrollmentModel(result.data, owner: label, origin: "本机恢复", appName: result.appName, verified: result.verified)
-                    status = result.verified ? "模型已保存，完整解密及明文哈希校验通过。可在 FairPlay 凭据中管理。" : "模型已保存并通过解密验证；部分映像缺少明文哈希，未标记为全部明文校验通过。"
+                    savedID = try model.addEnrollmentModel(result.data, owner: label, origin: "本机恢复", appName: result.appName, verified: result.verified)
+                    status = result.verified ? "模型已保存，已通过所选应用的解密与完整性校验。" : "模型已保存并通过解密验证；部分映像缺少明文哈希，未标记为全部明文校验通过。"
                 } catch is CancellationError { status = "已取消，临时文件已清理。" }
                 catch { failed = true; status = model.friendly(error) }
             }

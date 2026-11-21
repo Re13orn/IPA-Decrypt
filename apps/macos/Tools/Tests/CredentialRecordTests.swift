@@ -22,6 +22,14 @@ import Foundation
         precondition(groups.first { $0.owner == "fixture@example.invalid" }?.records.first?.id == id)
         precondition(groups.first { $0.owner == "empty@example.invalid" }?.records.isEmpty == true)
         precondition(groups.last?.owner == nil && groups.last?.records.count == 1)
+        let preferred = FairPlayCredential(owner: "preferred@example.invalid", data: Data(repeating: 1, count: 16))
+        let unbound = FairPlayCredential(owner: nil, data: Data(repeating: 2, count: 16))
+        let differentlyLabelled = FairPlayCredential(owner: "other@example.invalid", data: Data(repeating: 3, count: 16))
+        let duplicate = FairPlayCredential(owner: "other@example.invalid", data: preferred.data)
+        let model = FairPlayCredential(owner: nil, data: Data(repeating: 4, count: 16), kind: "mac-enrollment")
+        let malformed = FairPlayCredential(owner: nil, data: Data(repeating: 5, count: 15))
+        let candidates = CredentialRecords.orderedKeys([differentlyLabelled, preferred, unbound, duplicate, model, malformed], preferredOwner: preferred.owner)
+        precondition(candidates == [preferred.data, unbound.data, differentlyLabelled.data])
         print("PASS credential legacy migration, metadata round-trip, hex representation, fingerprints and Apple ID grouping")
     }
 }

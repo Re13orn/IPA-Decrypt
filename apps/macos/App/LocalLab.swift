@@ -1325,9 +1325,8 @@ struct AccountBook: Codable {
     func hasCredentials(for job: LocalJob) -> Bool { !candidateKeys(for: job).isEmpty || credentials.contains(where: \.isEnrollment) }
 
     private func candidateKeys(for job: LocalJob) -> [Data] {
-        if job.source == Flow.local.rawValue { return credentials.filter { !$0.isEnrollment }.map(\.data) }
-        let owner = job.credentialOwner ?? activeProfile(beta: job.source == Flow.beta.rawValue)?.owner
-        return credentials.filter { !$0.isEnrollment && ($0.owner == owner || $0.owner == nil) }.map(\.data)
+        let owner = job.flow == .local ? nil : job.credentialOwner ?? activeProfile(beta: job.flow == .beta)?.owner
+        return CredentialRecords.orderedKeys(credentials, preferredOwner: owner)
     }
 
     func friendly(_ error: Error) -> String {

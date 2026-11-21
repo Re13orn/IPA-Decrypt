@@ -11,7 +11,7 @@ import ZIPFoundation
         let inputBefore = try Data(contentsOf: input)
         let output = directory.appendingPathComponent("clear.ipa")
         let key = try Data(contentsOf: fixture.appendingPathComponent("credential.bin"))
-        try FairPlay.decrypt(source: input, destination: output, keys: [key])
+        try FairPlay.decrypt(source: input, destination: output, keys: [Data(repeating: 0xff, count: 16), key])
         let archive = try Archive(url: output, accessMode: .read)
         guard let member = archive["Payload/Test.app/Test"] else { fatalError("Missing plaintext executable") }
         var data = Data()
