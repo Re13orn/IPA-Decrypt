@@ -1,0 +1,60 @@
+{
+  "release": "v1.0.5",
+  "platforms": {
+    "macos": {
+      "version": "1.0.5",
+      "build": "6",
+      "minimum_os": "15.0",
+      "architecture": "arm64",
+      "release_build": "passed",
+      "packaged_mach_o_count": 24,
+      "installed_ui": "passed"
+    },
+    "ios": {
+      "version": "1.0.2",
+      "build": "3",
+      "minimum_os": "16.0",
+      "release_device_build": "passed",
+      "unsigned_ipa_resources": "passed",
+      "arm64_simulator_build": "passed",
+      "simulator_system": "26.3",
+      "simulator_device": "iPhone 17 Pro",
+      "account_entry_ui": "passed"
+    }
+  },
+  "checks": {
+    "offline_synthetic_suite": "passed",
+    "extractor_python_tests": 27,
+    "packaging_regressions": 8,
+    "shared_account_switcher_parity": "passed",
+    "source_privacy_scan": "passed; bounded scan"
+  },
+  "account_checks": [
+    "Mac App Store menu lists saved accounts and marks the active account.",
+    "Mac switched between two saved App Store accounts; selected email and automatic storefront updated.",
+    "App Store query retained across country changes; results invalidated for the new storefront.",
+    "Original App Store selection restored after checking.",
+    "TestFlight still displayed its independently selected account.",
+    "Reauthentication opened password/code fields without filling credentials; switching services collapsed and reset the form.",
+    "iPhone no-account entry opened App Store management directly; selecting TestFlight in management did not change the acquisition source after closing.",
+    "Actual TestFlight catalog request failed; final UI showed inline refresh and account-settings actions without a blocking generic alert."
+  ],
+  "limits": [
+    "Successful live TestFlight catalog refresh and new Apple authentication were not verified.",
+    "No account was removed; removal confirmation was inspected in source only.",
+    "No new physical iPhone installation acceptance was performed.",
+    "No account identifiers or session material are included in this report."
+  ],
+  "macos15_runtime": {
+    "status": "passed",
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/44917816459",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "launch": "passed",
+    "python_crypto": "passed",
+    "extractor_cli": "passed",
+    "usb_helpers": "passed",
+    "enrollment_helper": "passed",
+    "scope": "Packaged startup and offline helpers; no live account acceptance"
+  }
+}
