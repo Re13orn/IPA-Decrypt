@@ -6,10 +6,10 @@
 
 | 平台 | 版本 | 系统要求 |
 | --- | --- | --- |
-| iOS | [1.0.1](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.4) | iOS 16 及以上 |
-| macOS | 1.0.4 | Apple Silicon · macOS 15 及以上 |
+| iOS | [1.0.2](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.5) | iOS 16 及以上 |
+| macOS | 1.0.5 | Apple Silicon · macOS 15 及以上 |
 
-当前发布系列为 `1.0`；macOS 为 `1.0.4`，iOS 为 `1.0.1`，详见 [版本策略](docs/VERSIONING.md)。
+当前发布系列为 `1.0`；macOS 为 `1.0.5`，iOS 为 `1.0.2`，详见 [版本策略](docs/VERSIONING.md)。
 
 ## 界面预览
 
@@ -57,6 +57,12 @@ macOS 1.0.4：应用搜索、地区切换与下载操作，侧栏提供本机凭
 - **iOS**：下载未签名 IPA，使用适用于目标设备的有效签名后安装。
 
 Mac 当前采用 ad-hoc 签名，未公证。文件校验、系统安装提示及首次使用步骤见 [安装指南](docs/INSTALLATION.md)。
+
+## 多账户使用
+
+App Store 与 TestFlight 页面分别显示当前下载账户，可直接切换该服务已保存的账户。两种服务的账户选择独立；切换 TestFlight 后自动重新读取测试列表，App Store 的自动搜索地区跟随其自身账户。
+
+添加账户或更新会话请进入“管理账户”，使用“重新验证”打开登录表单。任务进行期间暂停切换账户；移除账户仅移除该服务在本 App 中保存的会话，保留已下载文件和 FairPlay 凭据。
 
 ## 源码构建
 

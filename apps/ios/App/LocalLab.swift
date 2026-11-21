@@ -228,9 +228,7 @@ struct AccountBook: Codable {
     private var storeStorage: StoreSessionStorage { StoreSessionStorage(directory: folder) }
 
     var automaticCountry: String {
-        Storefronts.country(for: activeProfile(beta: false)?.storefront) ??
-            Storefronts.country(for: activeProfile(beta: true)?.storefront) ??
-            Storefronts.deviceCountry
+        Storefronts.country(for: activeProfile(beta: false)?.storefront) ?? Storefronts.deviceCountry
     }
     var country: String { region.isEmpty ? automaticCountry : region }
 

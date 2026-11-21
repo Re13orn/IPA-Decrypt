@@ -58,6 +58,7 @@ import UniformTypeIdentifiers
     @State private var results: [AppResult] = []
     @State private var betas: [Beta] = []
     @State private var betaCatalogLoaded = false
+    @State private var betaProblem: String?
     @State private var searched = false
     @State private var historyQuery = ""
     @State private var historyFilter: JobListFilter = .all
@@ -136,10 +137,10 @@ import UniformTypeIdentifiers
             if connected && pendingStoreIntent != nil && accountsFor == .store { accountsFor = nil }
         }
         .onChange(of: model.country) { _ in resetSearch() }
-        .onChange(of: model.accounts.activeStore) { _ in resetSearch(); acquire = nil; versionApp = nil }
+        .onChange(of: model.accounts.activeStore) { _ in acquire = nil; versionApp = nil }
         .onChange(of: model.accounts.activeBeta) { account in
-            betas = []; beta = ""; betaCatalogLoaded = false
-            if account != nil { flow = .beta }
+            betas = []; beta = ""; betaCatalogLoaded = false; betaProblem = nil
+
         }
         .task(id: "\(flow.rawValue)-\(model.accounts.activeBeta?.uuidString ?? "none")") {
             guard flow == .beta, model.betaConnected, !busy else { return }
@@ -218,8 +219,16 @@ import UniformTypeIdentifiers
             }
 
             switch flow {
-            case .store: storeSection
-            case .beta: betaSection
+            case .store:
+                Section {
+                    ServiceAccountMenu(model: model, beta: false) { accountsFor = .store }.buttonStyle(.borderless)
+                } footer: {
+                    if model.activeProfile(beta: false) == nil { Text("搜索无需登录，下载使用此处选择的 App Store 账户。") }
+                }
+                storeSection
+            case .beta:
+                Section { ServiceAccountMenu(model: model, beta: true) { accountsFor = .beta }.buttonStyle(.borderless) }
+                betaSection
             case .local:
                 Section {
                     Button("从文件导入 IPA", systemImage: "folder") { chooseIPA() }.disabled(busy)
@@ -262,7 +271,7 @@ import UniformTypeIdentifiers
             }.disabled(busy)
         }
 
-        if !model.storeConnected {
+        if model.storeNeedsReauth {
             Section {
                 HStack(spacing: 12) {
                     Image(systemName: "person.crop.circle.badge.exclamationmark").foregroundStyle(.secondary).accessibilityHidden(true)
@@ -308,6 +317,10 @@ import UniformTypeIdentifiers
                     Task { await loadBetaCatalog() }
                 }
                 .disabled(busy)
+                if let betaProblem {
+                    Text(betaProblem).font(.callout).foregroundStyle(.secondary)
+                    Button("切换或重新验证账户") { accountsFor = .beta }.disabled(busy)
+                }
                 if betaCatalogLoaded && betas.isEmpty {
                     Text("当前账户没有返回可用的测试 App。").foregroundStyle(.secondary)
                 }
@@ -592,7 +605,7 @@ import UniformTypeIdentifiers
 
     private func loadBetaCatalog() async {
         guard !busy, let account = model.accounts.activeBeta else { return }
-        model.action = "正在读取测试列表"
+        model.action = "正在读取测试列表"; betaProblem = nil
         defer { model.action = nil }
         do {
             let result = try await model.betaCatalog()
@@ -600,7 +613,7 @@ import UniformTypeIdentifiers
             betas = result
             betaCatalogLoaded = true
         } catch is CancellationError { }
-        catch { model.message = model.friendly(error) }
+        catch { if model.accounts.activeBeta == account { betaProblem = "未能读取当前账户的测试列表。请刷新，或重新验证、切换账户。" } }
     }
 
     private func startBeta(_ title: String, bundle: String, replacing job: LocalJob? = nil) {
@@ -711,6 +724,8 @@ private struct DownloadProgressView: View {
     @State private var problem: String?
     @State private var diagnostic: String?
     @State private var accountAction = false
+    @State private var removingAccount = false
+
 
     var connected: Bool { betaSelected ? model.betaConnected : model.storeConnected }
     private var canSwitchFromSMS: Bool {
@@ -738,6 +753,7 @@ private struct DownloadProgressView: View {
                 }.pickerStyle(.segmented).disabled(signingIn)
                     .onChange(of: betaSelected) { _ in
                         addingAccount = false
+                        initialCode = ""; useInitialCode = false; filledSavedPassword = false; accountAction = false
                         email = ""
                         password = ""
                         showPassword = false
@@ -746,6 +762,7 @@ private struct DownloadProgressView: View {
                         problem = nil
                         diagnostic = nil
                     }
+                Section { Text("App Store 与 TestFlight 可使用不同账户。").font(.footnote).foregroundStyle(.secondary) }
                 authenticationSection
                 if !betaSelected {
                     Section {
@@ -758,12 +775,14 @@ private struct DownloadProgressView: View {
                     Button("管理凭据", systemImage: "key") { showCredentials = true }.disabled(signingIn)
                     Text("已保存 \(model.keyCount) 个凭据").font(.footnote).foregroundStyle(.secondary)
                 }
+                if !betaSelected {
                 Section {
                     NavigationLink {
                         RegionPicker(model: model)
                     } label: {
                         LabeledContent("搜索地区", value: Storefronts.name(model.country))
                     }.disabled(signingIn || model.action != nil)
+                }
                 }
                 if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
                     Section { LabeledContent("IPA 解密", value: version).foregroundStyle(.secondary) }
@@ -779,6 +798,13 @@ private struct DownloadProgressView: View {
                 email = model.activeProfile(beta: false)?.email ?? ""
             }
         }
+        .confirmationDialog("移除当前账户？", isPresented: $removingAccount, titleVisibility: .visible) {
+            Button("移除该服务的账户", role: .destructive) {
+                do { try model.signOut(beta: betaSelected); password = ""; initialCode = ""; email = model.activeProfile(beta: betaSelected)?.email ?? ""; addingAccount = false }
+                catch { problem = model.friendly(error) }
+            }
+            Button("取消", role: .cancel) { }
+        } message: { Text("将移除此 App 保存的该服务会话；另一服务的账户、已下载 IPA 和凭据不受影响。") }
         .onChange(of: scenePhase) { phase in if phase != .active { showPassword = false } }
         .sheet(isPresented: $showCredentials) {
             CredentialsSheet(model: model, owner: model.activeProfile(beta: betaSelected)?.owner)
@@ -792,11 +818,12 @@ private struct DownloadProgressView: View {
                 Section(betaSelected ? "TestFlight" : "App Store") {
                     if betaSelected ? !model.accounts.beta.isEmpty : !model.accounts.store.isEmpty {
                         ForEach(betaSelected ? model.accounts.beta : model.accounts.store) { profile in
+                            HStack(spacing: 12) {
                             Button {
                                 do {
                                     try model.switchAccount(profile.id, beta: betaSelected)
                                     addingAccount = false
-                                    problem = nil
+                                    problem = nil; diagnostic = nil; password = ""; initialCode = ""; showPassword = false
                                     if profile.needsReauth == true { email = profile.email; password = "" }
                                 }
                                 catch { problem = model.friendly(error) }
@@ -817,16 +844,19 @@ private struct DownloadProgressView: View {
                                             .accessibilityLabel("当前账户")
                                     }
                                 }
-                            }.disabled(signingIn || model.action != nil)
+                            }.buttonStyle(.borderless).disabled(signingIn || model.action != nil)
+                            Button("验证") { prepareLogin(profile.email) }
+                                .buttonStyle(.borderless).font(.callout)
+                                .accessibilityLabel("重新验证 " + profile.email)
+                                .disabled(signingIn || model.action != nil)
+                            }
                         }
                         Button(addingAccount ? "取消添加" : "添加 Apple 账户",
                                systemImage: addingAccount ? "xmark" : "person.badge.plus") {
-                            addingAccount.toggle(); email = ""; password = ""; problem = nil; diagnostic = nil
+                            addingAccount.toggle(); email = ""; password = ""; initialCode = ""; useInitialCode = false; showPassword = false; filledSavedPassword = false; problem = nil; diagnostic = nil
                         }.disabled(signingIn || model.action != nil)
-                        Button("退出当前账户", role: .destructive) {
-                            do { try model.signOut(beta: betaSelected) }
-                            catch { problem = model.friendly(error) }
-                        }.disabled(signingIn || model.action != nil)
+                        Button("移除此服务的当前账户…", role: .destructive) { removingAccount = true }
+                            .disabled(signingIn || model.action != nil)
                     }
                     if !connected || addingAccount {
                         TextField("Apple 账户", text: $email).keyboardType(.emailAddress)
@@ -843,7 +873,7 @@ private struct DownloadProgressView: View {
                             }
                         passwordFields
                         if betaSelected {
-                            Toggle("设备验证登录（实验）", isOn: $nativeBetaMode).disabled(signingIn)
+                            Toggle("设备验证登录", isOn: $nativeBetaMode).disabled(signingIn)
                             if !nativeBetaMode { Toggle("使用短信验证码", isOn: $betaSMS).disabled(signingIn) }
                         }
                         if !betaSelected || nativeBetaMode {
@@ -859,7 +889,7 @@ private struct DownloadProgressView: View {
                             .disabled(signingIn || email.isEmpty || password.isEmpty || model.action != nil ||
                                       ((!betaSelected || nativeBetaMode) && useInitialCode && !validCode(initialCode)))
                         if betaSelected && nativeBetaMode {
-                            Text("此方式使用受信任设备验证码，请保持 App 在前台。关闭开关可使用原登录方式与短信验证。真实账户登录仍待验证。")
+                            Text("此方式使用受信任设备验证码，请保持 App 在前台。关闭开关可使用原登录方式与短信验证。")
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
                     }
@@ -925,6 +955,12 @@ private struct DownloadProgressView: View {
                 } catch { problem = model.friendly(error) }
             }.disabled(signingIn)
         }
+    }
+
+    private func prepareLogin(_ account: String) {
+        email = account; password = ""; initialCode = ""; filledSavedPassword = false
+        showPassword = false; rememberPassword = false; addingAccount = true
+        hasSavedPassword = model.savedPassword(for: account) != nil; problem = nil; diagnostic = nil
     }
 
     private func validCode(_ value: String) -> Bool {

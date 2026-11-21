@@ -58,6 +58,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var historyQuery = ""
     @State private var historyFilter: JobListFilter = .all
     @State private var testsLoaded = false
+    @State private var testsProblem: String?
     @State private var detail: AppSelection?
     private enum DetailAction { case download(AppResult), versions(AppResult), acquire(AppResult) }
     @State private var detailAction: DetailAction?
@@ -150,8 +151,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
             Button("删除", role: .destructive) { if let removing { do { try model.removeJob(removing) } catch { model.message = model.friendly(error) } }; removing = nil }
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("ImportIPA"))) { _ in importIPA() }
-        .onChange(of: model.accounts.activeBeta) { tests = []; testsLoaded = false }
-        .onChange(of: model.accounts.activeStore) { results = []; searched = false }
+        .onChange(of: model.accounts.activeBeta) { tests = []; testsLoaded = false; testsProblem = nil }
         .onChange(of: model.country) { results = []; searched = false }
         .onOpenURL { url in
             if url.pathExtension.lowercased() == "ipa" { showHistory(); run("正在导入 IPA") { try await model.importIPA(url) } }
@@ -173,7 +173,10 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 .disabled(model.action != nil)
             }.padding()
             Divider()
-            if !model.storeConnected {
+            ServiceAccountMenu(model: model, beta: false) { loginBeta = false; login = true }
+                .menuStyle(.borderlessButton).padding(.horizontal).padding(.vertical, 10)
+            Divider()
+            if model.storeNeedsReauth {
                 HStack(spacing: 12) {
                     Image(systemName: "person.crop.circle.badge.exclamationmark").foregroundStyle(.orange)
                     VStack(alignment: .leading, spacing: 4) {
@@ -215,12 +218,18 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     private var betaView: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("已加入的测试").font(.headline)
+                ServiceAccountMenu(model: model, beta: true) { loginBeta = true; login = true }.menuStyle(.borderlessButton)
                 if testsLoaded { Text("\(tests.count) 个 App").font(.caption).foregroundStyle(.secondary) }
                 Spacer()
                 Button("刷新", systemImage: "arrow.clockwise") { loadTests() }.disabled(!model.betaConnected || model.action != nil)
             }.padding()
             Divider()
+            if let testsProblem, !tests.isEmpty {
+                HStack {
+                    Label(testsProblem, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(.secondary)
+                    Button("账户设置") { loginBeta = true; login = true }.disabled(model.action != nil)
+                }.padding()
+            }
             if !model.betaConnected {
                 ContentUnavailableView {
                     Label("登录 TestFlight", systemImage: "paperplane")
@@ -233,9 +242,9 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 Spacer(); ProgressView("正在读取测试列表…"); Spacer()
             } else if tests.isEmpty {
                 ContentUnavailableView {
-                    Label(testsLoaded ? "暂无可用测试" : "读取测试列表", systemImage: "paperplane")
+                    Label(testsProblem != nil ? "无法读取测试列表" : testsLoaded ? "暂无可用测试" : "读取测试列表", systemImage: testsProblem != nil ? "exclamationmark.circle" : "paperplane")
                 } description: {
-                    Text(testsLoaded ? "当前账户未返回可用的测试 App，可更换账户或稍后刷新。" : "刷新列表以查看此账户加入的测试。")
+                    Text(testsProblem ?? (testsLoaded ? "当前账户未返回可用的测试 App，可更换账户或稍后刷新。" : "刷新列表以查看此账户加入的测试。"))
                 } actions: {
                     Button("刷新列表") { loadTests() }.disabled(model.action != nil)
                     Button("账户设置") { loginBeta = true; login = true }.disabled(model.action != nil)
@@ -250,7 +259,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     }.padding(.vertical, 8)
                 }
             }
-        }.task { if !testsLoaded && model.betaConnected { loadTests() } }
+        }.task(id: model.accounts.activeBeta) { if model.betaConnected { loadTests() } }
     }
     private var visibleJobs: [LocalJob] { model.jobs.filter { historyFilter.includes($0, query: historyQuery) } }
     private var historyView: some View {
@@ -364,7 +373,21 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
         }
     }
     private func search() { run("正在搜索") { results = []; searched = false; results = try await model.catalog(query); searched = true } }
-    private func loadTests() { run("正在读取测试目录") { tests = try await model.betaCatalog(); testsLoaded = true } }
+    private func loadTests() {
+        guard let account = model.accounts.activeBeta, model.action == nil else { return }
+        model.action = "正在读取测试目录"; testsProblem = nil
+        Task {
+            defer { model.action = nil }
+            do {
+                let entries = try await model.betaCatalog()
+                guard model.accounts.activeBeta == account else { return }
+                tests = entries; testsLoaded = true
+            } catch {
+                guard model.accounts.activeBeta == account else { return }
+                testsProblem = "未能读取当前账户的测试列表。请刷新，或在账户设置中重新验证、切换账户。"
+            }
+        }
+    }
     private func download(_ app: AppResult, version: String? = nil) { showHistory(); run("正在下载 IPA") { try await model.download(app, version: version) } }
     private func run(_ title: String, operation: @escaping @MainActor () async throws -> Void) {
         guard model.action == nil else { return }
@@ -404,50 +427,102 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var busy = false
     @State private var problem: String?
     @State private var diagnostic: String?
+    @State private var addingAccount = false
+    @State private var removingAccount = false
+    @State private var success: String?
+    private var profiles: [AppleProfile] { beta ? model.accounts.beta : model.accounts.store }
+    private var service: String { beta ? "TestFlight" : "App Store" }
+    private var showLogin: Bool { profiles.isEmpty || addingAccount || model.activeProfile(beta: beta)?.needsReauth == true }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack { Text("Apple 账户").font(.title2.bold()); Spacer(); Button("完成") { dismiss() }.disabled(busy) }
             Picker("服务", selection: $beta) { Text("App Store").tag(false); Text("TestFlight").tag(true) }.pickerStyle(.segmented).disabled(busy)
             ScrollView {
                 Form {
-                    Section("已保存账户") {
-                        ForEach(beta ? model.accounts.beta : model.accounts.store) { account in
-                            HStack { Button(account.email) { do { try model.switchAccount(account.id, beta: beta); email = account.email; password = model.savedPassword(for: email) ?? "" } catch { problem = model.friendly(error) } }; if !beta && account.needsReauth == true { Text("需重新登录").font(.caption).foregroundStyle(.orange) }; Spacer(); if model.activeProfile(beta: beta)?.id == account.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(.blue) } }
+                    Section(service + " 账户") {
+                        Text("App Store 与 TestFlight 可使用不同账户。").font(.caption).foregroundStyle(.secondary)
+                        ForEach(profiles) { account in
+                            HStack(spacing: 12) {
+                                Button {
+                                    do {
+                                        try model.switchAccount(account.id, beta: beta)
+                                        addingAccount = false; email = account.email; password = ""; code = ""; reveal = false
+                                        problem = nil; diagnostic = nil; success = "已切换 " + service + " 下载账户。"
+                                    } catch { show(error) }
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(account.email).lineLimit(1).truncationMode(.middle)
+                                            Text(account.needsReauth == true ? "需重新登录" : model.activeProfile(beta: beta)?.id == account.id ? "当前下载账户" : "可切换")
+                                                .font(.caption).foregroundStyle(account.needsReauth == true ? Color.orange : .secondary)
+                                        }
+                                        Spacer()
+                                        if model.activeProfile(beta: beta)?.id == account.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(.blue) }
+                                    }.contentShape(Rectangle())
+                                }.buttonStyle(.borderless)
+                                Button("重新验证") { prepareLogin(account.email) }.buttonStyle(.borderless)
+                            }
                         }
-                        Button("退出当前账户") { do { try model.signOut(beta: beta) } catch { problem = model.friendly(error) } }
-                    }.disabled(busy)
-                    Section("登录或添加账户") {
+                        Button(addingAccount ? "取消登录表单" : "添加 " + service + " 账户", systemImage: addingAccount ? "xmark" : "person.badge.plus") {
+                            if addingAccount { addingAccount = false; password = ""; code = ""; reveal = false }
+                            else { prepareLogin("") }
+                        }
+                        if model.activeProfile(beta: beta) != nil {
+                            Button("移除此服务的当前账户…", role: .destructive) { removingAccount = true }
+                        }
+                    }.disabled(busy || model.action != nil)
+                    if showLogin {
+                    Section(service + " 登录") {
                         if !beta && model.storeNeedsReauth { Text("当前 App Store 会话已失效。请选择账户并重新登录；仅切换账户不会刷新过期会话。").font(.caption).foregroundStyle(.orange) }
                         TextField("Apple 账户", text: $email).textContentType(.username)
                         HStack { Group { if reveal { TextField("密码", text: $password) } else { SecureField("密码", text: $password) } }; Button { reveal.toggle() } label: { Image(systemName: reveal ? "eye.slash" : "eye") }.buttonStyle(.borderless) }
                         Toggle("在此 Mac 保存密码", isOn: $remember)
-                        if !beta {
-                            Toggle("会话过期后自动重新登录", isOn: $model.automaticStoreLogin)
-                            Text("仅使用此 Mac 已保存的密码；Apple 要求验证码时仍需输入。自动恢复失败后停止，手动登录成功或更新保存密码后可再次自动恢复。").font(.caption).foregroundStyle(.secondary)
-                        }
                         Button("填入已保存密码") { password = model.savedPassword(for: email) ?? "" }
                         if beta { Toggle("设备验证登录", isOn: $native); if !native { Toggle("使用短信验证码", isOn: $sms) } }
                         TextField("已有验证码（可留空）", text: $code).textContentType(.oneTimeCode)
                         Button(busy ? "正在登录…" : "登录") { signIn() }.buttonStyle(.borderedProminent).disabled(busy || email.isEmpty || password.isEmpty)
                         if beta { Button("重建 TestFlight 会话") { busy = true; Task { defer { busy = false }; do { try await model.retryBetaSession(email: email); problem = "会话已建立。" } catch { show(error) } } }.disabled(busy || email.isEmpty) }
                     }
+                    }
+                    if !beta {
+                    Section("会话恢复") {
+                        Toggle("会话过期后自动重新登录", isOn: $model.automaticStoreLogin)
+                        Text("使用此 Mac 已保存的密码；需要验证码时提示输入，失败后停止自动尝试。").font(.caption).foregroundStyle(.secondary)
+                    }
                     Section("搜索地区") {
                         Picker("地区", selection: $model.region) { Text("自动 · " + Storefronts.name(model.automaticCountry)).tag(""); ForEach(Storefronts.regions, id: \.self) { Text(Storefronts.name($0)).tag($0) } }
                     }
+                    }
+                    if let success { Label(success, systemImage: "checkmark.circle").font(.callout).foregroundStyle(.green) }
                     if let problem { Text(problem).foregroundStyle(.red).textSelection(.enabled) }
                     if let diagnostic { Text(diagnostic).font(.caption.monospaced()).textSelection(.enabled) }
                 }.formStyle(.grouped)
             }
         }.padding(24).frame(width: 560, height: 680)
+        .interactiveDismissDisabled(busy)
         .sheet(isPresented: $model.askingCode, onDismiss: { model.finishCode(nil) }) { MacVerification(model: model) }
         .onAppear { if email.isEmpty { email = model.activeProfile(beta: beta)?.email ?? "" } }
-        .onChange(of: beta) { email = model.activeProfile(beta: beta)?.email ?? ""; password = ""; code = ""; problem = nil; diagnostic = nil }
+        .onChange(of: beta) { email = model.activeProfile(beta: beta)?.email ?? ""; password = ""; code = ""; reveal = false; remember = false; addingAccount = false; problem = nil; diagnostic = nil; success = nil }
+        .onChange(of: email) { password = ""; code = ""; reveal = false; problem = nil; diagnostic = nil; success = nil }
+        .onDisappear { password = ""; code = ""; reveal = false }
+        .confirmationDialog("移除当前 " + service + " 账户？", isPresented: $removingAccount) {
+            Button("移除账户", role: .destructive) {
+                do { try model.signOut(beta: beta); email = model.activeProfile(beta: beta)?.email ?? ""; password = ""; code = ""; addingAccount = false; success = "已移除该服务的账户。" }
+                catch { show(error) }
+            }
+        } message: { Text("将移除此 App 保存的该服务会话；另一服务的账户、已下载 IPA 和凭据不受影响。") }
+
+    }
+    private func prepareLogin(_ account: String) {
+        email = account; password = ""; code = ""; reveal = false; remember = false
+        problem = nil; diagnostic = nil; success = nil; addingAccount = true
     }
     private func show(_ error: Error) { problem = model.friendly(error); diagnostic = (error as? StoreIssue)?.diagnostic }
     private func signIn() {
         let user = email, secret = password, service = beta, save = remember, useNative = native, initial = code, useSMS = sms
-        busy = true; problem = nil; diagnostic = nil
-        Task { defer { busy = false }; do { try await model.login(email: user, password: secret, beta: service, initialCode: initial, betaSMS: useSMS, nativeBeta: service && useNative); if save { try model.savePassword(secret, for: user) }; password = ""; code = ""; problem = "登录成功。" } catch { show(error) } }
+        busy = true; problem = nil; diagnostic = nil; success = nil
+        Task { defer { busy = false }; do { try await model.login(email: user, password: secret, beta: service, initialCode: initial, betaSMS: useSMS, nativeBeta: service && useNative); if save { try model.savePassword(secret, for: user) }; password = ""; code = ""; addingAccount = false; success = (service ? "TestFlight" : "App Store") + " 账户已登录。" } catch { show(error) } }
     }
 }
 
