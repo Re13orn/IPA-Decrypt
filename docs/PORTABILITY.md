@@ -1,6 +1,6 @@
 # 兼容性验证
 
-当前版本：**macOS 1.0.7 (8) · iOS 1.0.3 (4)**。本次结果见 [1.0.7 验证记录](validation/2026-11-22-v1.0.7.json)。
+当前版本：**macOS 1.0.8 (9) · iOS 1.0.3 (4)**。本次结果见 [1.0.8 验证记录](validation/2026-11-22-v1.0.8.json)。
 
 ## 平台范围
 
@@ -25,7 +25,7 @@ Mac 1.0.2 在本机 Apple Silicon / macOS 26.4.1 完成实际系统授权、注�
 
 ## macOS 15 运行验证
 
-[GitHub Actions 验证任务](https://github.com/Re13orn/IPA-Decrypt/actions/runs/44956743837) 在 macOS 15.8.2 / arm64 上下载并校验最终 DMG，复制 App 后检查签名及资源、实际启动 SwiftUI 界面，并验证 Python 加密模块、提取器 CLI、三个 USB 工具及本机模型组件。
+[GitHub Actions 验证任务](https://github.com/Re13orn/IPA-Decrypt/actions/runs/44973337285) 在 macOS 15.8.2 / arm64 上下载并校验最终 DMG，复制 App 后检查签名及资源、实际启动 SwiftUI 界面，并验证 Python 加密模块、提取器 CLI、三个 USB 工具及本机模型组件。
 
 该结果不代表已完成用户反馈设备的 macOS 15.6.1 验收，也不覆盖账户登录、下载和真实设备解密。
 

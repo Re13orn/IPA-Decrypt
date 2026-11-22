@@ -29,5 +29,17 @@
     "The stored TestFlight session was rejected with HTTP 401.",
     "Successful account reauthentication, list retrieval and download were not verified.",
     "No credential extraction was performed."
-  ]
+  ],
+  "macos15_runtime": {
+    "status": "passed",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/44973337285",
+    "launch": "passed",
+    "python_crypto": "passed",
+    "extractor_cli": "passed",
+    "usb_helpers": "passed",
+    "enrollment_helper": "passed",
+    "scope": "Packaged startup and offline helper checks; no account or real-device acceptance"
+  }
 }
