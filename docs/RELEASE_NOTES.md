@@ -10,4 +10,4 @@
 
 Mac 下载 `IPA-Decrypt-macOS-1.0.8-arm64.dmg`，要求 Apple Silicon / macOS 15+，采用 ad-hoc 签名，未公证。
 
-iOS 沿用 1.0.3，安装包未修改；安装未签名 IPA 前需有效签名。附件含源码与 SHA256SUMS。
+iOS 沿用 [1.0.3 安装包](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.7/IPA-Decrypt-iOS-1.0.3-unsigned.ipa)，本次未修改；安装未签名 IPA 前需有效签名。附件含 Mac 安装包、源码与 SHA256SUMS。

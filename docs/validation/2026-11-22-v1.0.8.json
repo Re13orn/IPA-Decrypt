@@ -1,0 +1,33 @@
+{
+  "release": "v1.0.8",
+  "macos": {
+    "version": "1.0.8",
+    "build": "9",
+    "minimum_os": "15.0",
+    "architecture": "arm64",
+    "release_build": "passed",
+    "packaged_mach_o_count": 24,
+    "pinned_runtime_resources": 7,
+    "installed_ui_launch": "passed"
+  },
+  "ios": {
+    "version": "1.0.3",
+    "status": "unchanged; linked from v1.0.7"
+  },
+  "checks": {
+    "offline_synthetic_suite": "passed",
+    "catalog_diagnostics": "passed; 401/403, provider status and network handling; response body excluded",
+    "local_ui": [
+      "Observed real TestFlight catalog HTTP 401 without exposing provider body.",
+      "Account header is pinned to the top and displays the account.",
+      "Reauthentication action is available on session rejection.",
+      "Account window opens on the TestFlight service."
+    ],
+    "release_bundle_checks": "passed"
+  },
+  "limits": [
+    "The stored TestFlight session was rejected with HTTP 401.",
+    "Successful account reauthentication, list retrieval and download were not verified.",
+    "No credential extraction was performed."
+  ]
+}
