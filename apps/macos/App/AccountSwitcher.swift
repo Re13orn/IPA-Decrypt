@@ -38,10 +38,8 @@ import SwiftUI
     private var accountLabel: some View {
         HStack(spacing: 10) {
             Image(systemName: beta ? "paperplane" : "person.crop.circle").foregroundStyle(.secondary).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(service + " 下载账户").font(.caption).foregroundStyle(.secondary)
-                Text(active?.email ?? "选择或登录账户").font(.callout.weight(.medium)).lineLimit(1).truncationMode(.middle)
-            }
+            Text(service + " · " + (active?.email ?? "选择或登录账户"))
+                .font(.callout.weight(.medium)).lineLimit(1).truncationMode(.middle)
             Spacer(minLength: 4)
             if active?.needsReauth == true {
                 Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange).accessibilityLabel("需要重新登录")

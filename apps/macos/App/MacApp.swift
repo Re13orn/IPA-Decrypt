@@ -59,6 +59,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var historyFilter: JobListFilter = .all
     @State private var testsLoaded = false
     @State private var testsProblem: String?
+    @State private var testsNeedReauth = false
     @State private var detail: AppSelection?
     private enum DetailAction { case download(AppResult), versions(AppResult), acquire(AppResult) }
     @State private var detailAction: DetailAction?
@@ -123,7 +124,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     .toolbar { ToolbarItem { Button("关闭") { detail = nil } } }
             }.frame(width: 860, height: 760)
         }
-        .sheet(isPresented: $login, onDismiss: resumeStoreRequest) { MacAccounts(model: model, beta: loginBeta) }
+        .sheet(isPresented: $login, onDismiss: resumeStoreRequest) { MacAccounts(model: model, beta: $loginBeta) }
         .onChange(of: model.storeConnected) { if model.storeConnected && pendingStoreRequest != nil && login { login = false } }
         .sheet(isPresented: Binding(get: { model.askingCode && !login && version == nil && detail == nil }, set: { if !$0 { model.finishCode(nil) } }), onDismiss: { model.finishCode(nil) }) {
             MacVerification(model: model)
@@ -152,7 +153,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
             Button("删除", role: .destructive) { if let removing { do { try model.removeJob(removing) } catch { model.message = model.friendly(error) } }; removing = nil }
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("ImportIPA"))) { _ in importIPA() }
-        .onChange(of: model.accounts.activeBeta) { tests = []; testsLoaded = false; testsProblem = nil }
+        .onChange(of: model.accounts.activeBeta) { tests = []; testsLoaded = false; testsProblem = nil; testsNeedReauth = false }
         .onChange(of: model.country) { results = []; searched = false }
         .onOpenURL { url in
             if url.pathExtension.lowercased() == "ipa" { showHistory(); run("正在导入 IPA") { try await model.importIPA(url) } }
@@ -223,7 +224,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 if testsLoaded { Text("\(tests.count) 个 App").font(.caption).foregroundStyle(.secondary) }
                 Spacer()
                 Button("刷新", systemImage: "arrow.clockwise") { loadTests() }.disabled(!model.betaConnected || model.action != nil)
-            }.padding()
+            }.fixedSize(horizontal: false, vertical: true).padding()
             Divider()
             if let testsProblem, !tests.isEmpty {
                 HStack {
@@ -231,6 +232,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     Button("账户设置") { loginBeta = true; login = true }.disabled(model.action != nil)
                 }.padding()
             }
+            Group {
             if !model.betaConnected {
                 ContentUnavailableView {
                     Label("登录 TestFlight", systemImage: "paperplane")
@@ -247,8 +249,11 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 } description: {
                     Text(testsProblem ?? (testsLoaded ? "当前账户未返回可用的测试 App，可更换账户或稍后刷新。" : "刷新列表以查看此账户加入的测试。"))
                 } actions: {
+                    if testsNeedReauth {
+                        Button("重新验证 TestFlight") { loginBeta = true; login = true }.buttonStyle(.borderedProminent).disabled(model.action != nil)
+                    }
                     Button("刷新列表") { loadTests() }.disabled(model.action != nil)
-                    Button("账户设置") { loginBeta = true; login = true }.disabled(model.action != nil)
+                    if !testsNeedReauth { Button("账户设置") { loginBeta = true; login = true }.disabled(model.action != nil) }
                 }
             } else {
                 List(tests) { app in
@@ -260,7 +265,9 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     }.padding(.vertical, 8)
                 }
             }
-        }.task(id: model.accounts.activeBeta) { if model.betaConnected { loadTests() } }
+            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .task(id: model.accounts.activeBeta) { if model.betaConnected { loadTests() } }
     }
     private var visibleJobs: [LocalJob] { model.jobs.filter { historyFilter.includes($0, query: historyQuery) } }
     private var historyView: some View {
@@ -378,7 +385,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     private func search() { run("正在搜索") { results = []; searched = false; results = try await model.catalog(query); searched = true } }
     private func loadTests() {
         guard let account = model.accounts.activeBeta, model.action == nil else { return }
-        model.action = "正在读取测试目录"; testsProblem = nil
+        model.action = "正在读取测试目录"; testsProblem = nil; testsNeedReauth = false
         Task {
             defer { model.action = nil }
             do {
@@ -387,7 +394,8 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 tests = entries; testsLoaded = true
             } catch {
                 guard model.accounts.activeBeta == account else { return }
-                testsProblem = "未能读取当前账户的测试列表。请刷新，或在账户设置中重新验证、切换账户。"
+                testsProblem = model.friendly(error)
+                testsNeedReauth = (error as? BetaCatalogFailure)?.requiresReauthentication == true
             }
         }
     }
@@ -419,7 +427,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
 @MainActor struct MacAccounts: View {
     @ObservedObject var model: LocalLab
     @Environment(\.dismiss) private var dismiss
-    @State var beta: Bool
+    @Binding var beta: Bool
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""

@@ -1122,8 +1122,19 @@ struct AccountBook: Codable {
     }
 
     func betaCatalog() async throws -> [Beta] {
-        let data = try await testFlight().catalog()
-        return try Beta.catalog(data)
+        do {
+            let data = try await testFlight().catalog()
+            return try Beta.catalog(data)
+        } catch {
+            if let error = error as? AppleAuthError {
+                throw BetaCatalogFailure.provider(message: error.message, code: error.code)
+            }
+            if let error = error as? URLError { throw BetaCatalogFailure.network(error.code.rawValue) }
+            if error is DecodingError || (error as NSError).domain == NSCocoaErrorDomain && (error as NSError).code == 3840 {
+                throw BetaCatalogFailure.invalidResponse
+            }
+            throw error
+        }
     }
 
     func artifact(_ job: LocalJob, clear: Bool) -> URL? {
@@ -1330,6 +1341,7 @@ struct AccountBook: Codable {
     }
 
     func friendly(_ error: Error) -> String {
+        if let error = error as? BetaCatalogFailure { return error.localizedDescription }
         if let error = error as? CatalogFailure { return error.localizedDescription }
         if let error = error as? StoreRecoveryFailure { return error.localizedDescription }
         if let error = error as? CredentialFileReader.Failure { return error.localizedDescription }
