@@ -22,7 +22,14 @@ class InstallationBundleTests(unittest.TestCase):
   names=['Python/bin/python3','Extractor/host.py','Extractor/license_plan.py','Extractor/askpass','bin/idevice_id','bin/ideviceinfo','bin/iproxy','bin/unfairplay']+['Extractor/bundle/'+x for x in ['credential.ios','driver.ios','trigger.ios','arcade-capture.ios','static-key-table.bin','core4-word-table.bin']]
   for name in names:
    file=r/name;file.parent.mkdir(parents=True,exist_ok=True);file.write_text('fixture');file.chmod(0o755)
+  proof=r/'StoreRuntime/unicorn.whl';proof.parent.mkdir();shutil.copyfile(ROOT/'.build-work/store-runtime/unicorn.whl',proof)
   return app
+ def test_missing_or_changed_proof_engine_rejected(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   app=self.make_bundle(Path(tmp));proof=app/'Contents/Resources/StoreRuntime/unicorn.whl';proof.unlink()
+   with self.assertRaisesRegex(installation.InvalidBundle,'Missing Store proof'):installation.inspect(app,'macos')
+   proof.write_bytes(b'corrupt')
+   with self.assertRaisesRegex(installation.InvalidBundle,'Changed Store proof'):installation.inspect(app,'macos')
  def test_complete_bundle_passes_and_missing_wasm_fails(self):
   with tempfile.TemporaryDirectory() as tmp:
    app=self.make_bundle(Path(tmp));self.assertEqual(installation.inspect(app,'macos')['mach_o_checked'],1)

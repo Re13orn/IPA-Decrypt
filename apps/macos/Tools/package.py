@@ -2,6 +2,9 @@
 from pathlib import Path
 import os
 import plistlib
+import hashlib
+import json
+import tarfile
 import shutil
 import subprocess
 
@@ -19,6 +22,14 @@ STAGE = OUTPUT / 'IPA 解密.building.app'
 if STAGE.exists(): shutil.rmtree(STAGE)
 contents = STAGE / 'Contents'; resources = contents / 'Resources'; frameworks = contents / 'Frameworks'; macos = contents / 'MacOS'
 macos.mkdir(parents=True); frameworks.mkdir(); shutil.copytree(BASE / 'Resources', resources, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store', 'build', '.build'))
+# Keep the upstream wheel intact: modifying/signing its dylib changes the hash
+# expected by ipatool. The app verifies and installs the original bytes locally.
+unicorn_lock = json.loads((ROOT / 'dependencies/unicorn-macos-arm64.lock.json').read_text())
+unicorn_archive = WORK / 'store-runtime/unicorn.whl'
+if not unicorn_archive.is_file() or hashlib.sha256(unicorn_archive.read_bytes()).hexdigest() != unicorn_lock['sha256']:
+    raise SystemExit('Missing/invalid pinned Unicorn archive; run scripts/bootstrap-unicorn.py --work .build-work/store-runtime')
+(resources / 'StoreRuntime').mkdir()
+shutil.copy2(unicorn_archive, resources / 'StoreRuntime/unicorn.whl')
 shutil.copy2(Path(os.environ.get('IPA_MAC_EXECUTABLE', str(BASE / '.build/release/IPADecryptMac'))), macos / 'IPADecryptMac')
 python = Path(os.environ.get('IPA_PYTHON_HOME', str(WORK / 'mac-ipa/python/cpython-3.12.14-macos-aarch64-none')))
 if not (python / 'bin/python3').exists():
@@ -74,8 +85,13 @@ while queue:
         relative = os.path.relpath(dest, binary.parent)
         subprocess.run(['install_name_tool','-change',dependency,'@loader_path/' + relative,str(binary)], check=True)
 
-info = dict(CFBundleExecutable='IPADecryptMac', CFBundleIdentifier='local.ipadecrypt.mac', CFBundleName='IPA 解密', CFBundleDisplayName='IPA 解密', CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString='1.0.8', CFBundleVersion='9', LSMinimumSystemVersion='15.0', NSHighResolutionCapable=True, LSMultipleInstancesProhibited=True, NSPrincipalClass='NSApplication', NSLocalNetworkUsageDescription='允许局域网设备下载你主动分享的 IPA。', NSAppTransportSecurity=dict(NSAllowsLocalNetworking=True), CFBundleDocumentTypes=[dict(CFBundleTypeName='IPA 与 FairPlay 凭据',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['public.data'])])
+info = dict(CFBundleExecutable='IPADecryptMac', CFBundleIdentifier='local.ipadecrypt.mac', CFBundleName='IPA 解密', CFBundleDisplayName='IPA 解密', CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString='1.0.9', CFBundleVersion='10', LSMinimumSystemVersion='15.0', NSHighResolutionCapable=True, LSMultipleInstancesProhibited=True, NSPrincipalClass='NSApplication', NSLocalNetworkUsageDescription='允许局域网设备下载你主动分享的 IPA。', NSAppTransportSecurity=dict(NSAllowsLocalNetworking=True), CFBundleDocumentTypes=[dict(CFBundleTypeName='IPA 与 FairPlay 凭据',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['public.data'])])
 (contents / 'Info.plist').write_bytes(plistlib.dumps(info))
+with tarfile.open(ROOT / 'apps/ios/Tools/ipatool/unicorn/unicorn-2.1.4.tgz') as source:
+    for name in ['COPYING', 'COPYING.LGPL2', 'COPYING_GLIB', 'qemu/COPYING', 'qemu/COPYING.LIB', 'qemu/LICENSE']:
+        target = resources / 'Licenses/Unicorn' / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.extractfile('unicorn-2.1.4/' + name).read())
 # Preserve ldid signatures/entitlements on device-side iOS helpers.
 for directory in [frameworks, resources / 'bin', resources / 'Python']:
     for binary in directory.rglob('*'):

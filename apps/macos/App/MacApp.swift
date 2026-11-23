@@ -5,6 +5,16 @@ import UniformTypeIdentifiers
 
 @main struct IPADecryptMac: App {
     @StateObject private var model = LocalLab()
+    init() {
+        if ProcessInfo.processInfo.arguments.contains("--store-runtime-check") {
+            do {
+                try StoreRuntime.checkEngine()
+                print("mac-store-runtime-check: passed"); fflush(stdout); exit(0)
+            } catch {
+                print("mac-store-runtime-check: failed " + error.localizedDescription); fflush(stdout); exit(1)
+            }
+        }
+    }
     var body: some Scene {
         WindowGroup("IPA 解密") {
             MacWorkspace(model: model).frame(minWidth: 980, minHeight: 660)

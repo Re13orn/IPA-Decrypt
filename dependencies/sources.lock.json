@@ -116,6 +116,10 @@
     {
       "path": "apps/ios/Tools/ipatool/transfer.patch",
       "sha256": "8e8238db45f70699ccec62ae959f14e51ae43688102d3fe8ddce15f3ff7710ab"
+    },
+    {
+      "path": "dependencies/unicorn-macos-arm64.lock.json",
+      "sha256": "c45fea9c8d682c2a8d11f1f2aac69ff6acd3c36fd6c89207b13691e0a67af373"
     }
   ]
 }

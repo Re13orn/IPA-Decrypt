@@ -28,6 +28,13 @@ def inspect(app,platform):
  for path in app.rglob('*'):
   require(path.name not in private,'User state included in app: '+path.name)
   if path.is_symlink():require(path.resolve().is_relative_to(app),'Symlink escapes bundle: '+path.name)
+ if platform=='macos':
+  proof=json.loads((Path(__file__).resolve().parents[1]/'dependencies/unicorn-macos-arm64.lock.json').read_text())
+  wheel=resources/'StoreRuntime/unicorn.whl'
+  require(wheel.is_file(),'Missing Store proof engine archive')
+  require(hashlib.sha256(wheel.read_bytes()).hexdigest()==proof['sha256'],'Changed Store proof engine archive')
+  with zipfile.ZipFile(wheel) as archive:
+   require(hashlib.sha256(archive.read(proof['member'])).hexdigest()==proof['library_sha256'],'Changed Store proof engine library')
  required=[]
  if platform=='macos':
   required=['Python/bin/python3','Extractor/host.py','Extractor/license_plan.py','Extractor/askpass','bin/idevice_id','bin/ideviceinfo','bin/iproxy','bin/unfairplay']

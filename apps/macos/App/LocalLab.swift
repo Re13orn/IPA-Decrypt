@@ -1093,9 +1093,9 @@ struct AccountBook: Codable {
             }
         case "runtime":
             if response.diagnostic == "login/unicorn-executable-memory" {
-                message = "当前设备或签名环境不允许 ipatool 运行设备证明。请在支持该运行库的越狱环境中运行 IPA 解密。"
+                message = "macOS 未允许设备证明组件执行。请提供诊断码及系统版本以便排查。"
             } else {
-                message = "IPA 解密 的设备证明运行库初始化失败。"
+                message = "设备证明运行库无法加载或执行。请提供下方诊断码及 macOS 版本。"
             }
         case "endpoint": message = "Apple 登录接口未返回可用会话。"
         case "transport": message = "连接 Apple 登录服务失败。请检查网络后重试。"
@@ -1341,6 +1341,7 @@ struct AccountBook: Codable {
     }
 
     func friendly(_ error: Error) -> String {
+        if let error = error as? StoreRuntime.Failure { return error.localizedDescription }
         if let error = error as? BetaCatalogFailure { return error.localizedDescription }
         if let error = error as? CatalogFailure { return error.localizedDescription }
         if let error = error as? StoreRecoveryFailure { return error.localizedDescription }
@@ -1380,6 +1381,8 @@ private struct StoreRequest: Encodable, Sendable {
     let state: [String: Data]
 
     func perform() throws -> StoreReply {
+        guard let resources = Bundle.main.resourceURL else { throw StoreRuntime.Failure.missing }
+        _ = try StoreRuntime.prepare(resources: resources)
         let request = String(decoding: try JSONEncoder().encode(self), as: UTF8.self)
         return try request.withCString { input in
             guard let output = IPAToolCall(UnsafeMutablePointer(mutating: input)) else {

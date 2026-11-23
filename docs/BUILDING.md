@@ -44,7 +44,8 @@ python3 scripts/build-native-ios.py --work "$PWD/.build-work/native-ios"
 - `Resources/PythonPackages` 与 standalone Python：Mac 打包运行时，单独准备。
 - 测试目录里的 `credential.bin` / IPA 是合成夹具，导出时保留并校验已知哈希；不能用真实文件覆盖。
 
-使用 `python3 scripts/verify-assets.py` 检查当前本地资源与快照是否一致；源码导出后缺失的二进制会明确报 MISSING，这是预期，不等于该源码包可直接完整运行。
+使用 `python3 scripts/smoke-macos.py "dist/macos/IPA 解密.app"
+python3 scripts/verify-assets.py` 检查当前本地资源与快照是否一致；源码导出后缺失的二进制会明确报 MISSING，这是预期，不等于该源码包可直接完整运行。
 
 ## Mac 打包
 
@@ -63,10 +64,13 @@ python3 scripts/bootstrap-usb.py --work "$PWD/.build-work/usb-runtime"
 打包默认使用 `.build-work/usb-runtime/prefix`；可通过 `IPA_USB_PREFIX` 指定其他同样经过构建的目录。源码下载逐项校验锁文件哈希，打包校验 9 个实际链接文件及构建记录；不依赖 Homebrew 安装的运行库。
 
 ```sh
+python3 scripts/bootstrap-unicorn.py --work .build-work/store-runtime
 export IPA_PYTHON_HOME="$PWD/.build-work/python-runtime/python"
 export IPA_PYTHON_PACKAGES="$PWD/.build-work/python-runtime/packages"
 bash scripts/build.sh package-macos
 ```
+
+设备证明运行库在构建时按 SHA-256 锁定下载，随包保留原始 wheel；首次使用从安装包展开，不依赖用户端下载。
 
 输出 `dist/macos/IPA 解密.app`。`IPA_MAC_OUTPUT` 可覆盖输出位置。脚本打包重定位 dylib，并进行本机 ad-hoc 签名；没有 Developer ID 公证。默认不会覆盖 `/Applications`，不会删除用户数据。
 
@@ -124,3 +128,5 @@ gh workflow run macos-compatibility.yml -f tag=v1.0.1
 此流程应在发布草稿准备完成后运行，通过后再正式发布。完整业务流程和具体用户机器仍需分别验收。
 
 本机模型服务的可选私有验证程序为 `apps/macos/Tools/Tests/EnrollmentIntegration.swift`。仅在本机提供私有快照和已安装应用作为参数，验证恢复、完整解密、重复模型、覆盖导出、许可证不匹配与取消清理。测试不接收密码，真实快照、模型和验证 IPA 禁止进入仓库或公开日志。
+
+Mac 运行检查包含空 HOME、禁止网络条件下的设备证明引擎执行，不涉及 Apple 账户登录。
