@@ -8,7 +8,7 @@ def require(ok,reason):
  if not ok:raise InvalidBundle(reason)
 def expand(value,binary,executable):
  return value.replace('@loader_path',str(binary.parent)).replace('@executable_path',str(executable.parent))
-def inspect(app,platform):
+def inspect(app,platform,*,proof_lock=None):
  app=app.resolve();require(app.is_dir(),'App directory missing')
  contents=app/'Contents' if platform=='macos' else app
  info=plistlib.loads((contents/'Info.plist').read_bytes());main=contents/('MacOS' if platform=='macos' else '')/info['CFBundleExecutable']
@@ -29,7 +29,7 @@ def inspect(app,platform):
   require(path.name not in private,'User state included in app: '+path.name)
   if path.is_symlink():require(path.resolve().is_relative_to(app),'Symlink escapes bundle: '+path.name)
  if platform=='macos':
-  proof=json.loads((Path(__file__).resolve().parents[1]/'dependencies/unicorn-macos-arm64.lock.json').read_text())
+  proof=proof_lock if proof_lock is not None else json.loads((Path(__file__).resolve().parents[1]/'dependencies/unicorn-macos-arm64.lock.json').read_text())
   wheel=resources/'StoreRuntime/unicorn.whl'
   require(wheel.is_file(),'Missing Store proof engine archive')
   require(hashlib.sha256(wheel.read_bytes()).hexdigest()==proof['sha256'],'Changed Store proof engine archive')
