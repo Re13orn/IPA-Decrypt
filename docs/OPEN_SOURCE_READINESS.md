@@ -2,10 +2,10 @@
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 源码仓库 | [Re13orn/IPA-Decrypt](https://github.com/Re13orn/IPA-Decrypt) · 私有 |
-| 当前发行 | [v1.0.0](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.0) · 当前维护版本 |
-| 应用版本 | iOS 1.0.0 · macOS 1.0.0 |
-| 下载附件 | Mac DMG、iOS 未签名 IPA、源码 ZIP、SHA-256 校验文件 |
+| 源码仓库 | [Re13orn/IPA-Decrypt](https://github.com/Re13orn/IPA-Decrypt) · 公开 |
+| 当前发行 | [v1.0.9](https://github.com/Re13orn/IPA-Decrypt/releases/tag/v1.0.9) · 当前 Mac 发布 |
+| 应用版本 | iOS 1.0.3 · macOS 1.0.9 |
+| 下载附件 | Mac DMG、源码 ZIP、SHA-256 校验文件；iOS 未签名 IPA 继续链接 v1.0.7 附件 |
 | macOS 签名 | ad-hoc，未公证 |
 | iOS 签名 | 未签名，安装前需完成有效签名 |
 

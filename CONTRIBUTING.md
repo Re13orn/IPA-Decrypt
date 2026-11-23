@@ -1,29 +1,39 @@
-# 贡献指南
+# Contributing
 
-开发前请阅读 [项目说明](README.md)、[构建文档](docs/BUILDING.md) 与 [已知问题](docs/KNOWN_ISSUES.md)。仓库当前为私有，访问与贡献需要相应权限。
+[English](CONTRIBUTING.md) · [简体中文](CONTRIBUTING.zh-CN.md)
 
-## 开发要求
+Read the [project overview](README.md), [build guide](docs/en/BUILDING.md), and [known issues](docs/en/KNOWN_ISSUES.md). Contributions to this public repository are welcome through issues, discussions, and pull requests.
 
-- 使用合成账户、`example.invalid` 域名及合成凭据进行自动化测试。
-- 数据模型及文件路径调整应验证既有记录的兼容性。
-- 账户标签与凭据内容分别管理，去重依据实际凭据数据。
-- 平台认证改动应分别验证账户认证、会话建立和下载流程。
-- 第三方代码与资源更新应保留来源、版权、许可及固定版本记录。
-- 提交范围应限于源码、文档与必要测试资源；签名、用户数据、生成库、缓存及安装包通过各自流程管理。
+## Development
 
-## 验证
+- Use synthetic accounts, `example.invalid` domains, and synthetic credentials in automated tests.
+- Validate existing records when changing data models or paths.
+- Keep account labels separate from credential bytes; deduplicate by actual content.
+- Test account authentication, session creation, and downloads separately when changing authentication.
+- Preserve provenance, fixed versions, copyright, and license notices for third-party inputs.
+- Commit source, documentation, and necessary test fixtures. Keep signing material, user data, generated libraries, caches, and install packages out of source commits.
+
+## Checks
 
 ```sh
 python3 scripts/verify-dependencies.py
 bash scripts/test.sh
 ```
 
-根据改动范围执行对应平台构建，并记录测试环境、验证结果与未覆盖范围。
+Run platform builds and package checks appropriate to the change. Record the environment, results, and unverified scope. Documentation-only edits need link/content checks rather than an app rebuild.
 
-## Pull Request
+## Pull requests
 
-说明问题触发条件、行为变化、兼容性影响与测试结果。涉及数据迁移或文件处理时，应提供相应回归验证。
+Describe the concrete trigger, changed behavior, compatibility impact, and validation. Add regression coverage for data migrations and file-processing changes.
 
-## 问题反馈
+## Reports
 
-请提供系统版本、应用版本、操作来源（App Store / TestFlight / 本地）、诊断阶段码和复现步骤。敏感安全问题见 [安全报告说明](SECURITY.md)。
+Use [Discussions](https://github.com/Re13orn/IPA-Decrypt/discussions) for questions and ideas. [Report a bug](https://github.com/Re13orn/IPA-Decrypt/issues/new/choose) with app and OS versions, the workflow, diagnostic stage code, and reproduction steps. English and 简体中文 are both welcome. See [SECURITY.md](SECURITY.md) for sensitive reports.
+
+## Releases
+
+- Documentation, screenshots, and repository settings do not require an app version bump.
+- Group related compatible fixes into a release with a clear purpose.
+- Installation, login, and file-processing blockers may need a separate hotfix.
+- Version the two platforms independently; link to a validated existing asset when that platform has not changed.
+- Release notes describe behavior changes, validation evidence, and remaining limits.

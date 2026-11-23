@@ -12,7 +12,7 @@
 | MbedTLS | 3.6.5，源码压缩包 SHA-256 锁定 | 保留上游许可证及附属 notices |
 | nlohmann/json | 3.12.0 / `55f93686c01528224f448c19128836e7df245f72` | MIT，已包含固定 single_include 和原始许可 |
 | LZFSE | `e634ca58b4821d9f3d560cdc6df5dec02ffc93fd` | BSD-3-Clause，已包含固定源码，构建不再远程 FetchContent |
-| Unicorn | 2.1.4 + 固定 iOS patch | README/COPYING 声明 GPLv2，部分文件标注其他许可；**不能按 Python 包元数据的 BSD 判定引擎许可**。与应用 GPL-3.0-only 静态组合仍需审查 |
+| Unicorn | 2.1.4 + 固定 iOS patch / Mac arm64 wheel | README/COPYING 声明 GPLv2，部分文件标注其他许可；**不能按 Python 包元数据的 BSD 判定引擎许可**。与应用 GPL-3.0-only 静态组合仍需审查 |
 | Go | 工具链 go1.26.5，go.mod/go.sum 固定 | 完整模块图记录 202 项；Mac 桥接实际导入 50 项，收集根目录 notices；嵌套第三方代码审查仍需完成 |
 | CPython | 3.12.14 / standalone build 20260901，aarch64-apple-darwin | 固定官方发行 URL 与 SHA-256；CPython LICENSE 已保留，独立发行内其他原生库 notices 尚需核齐 |
 | cryptography / cffi / pycparser | 50.0.2 / 2.1.1 / 3.12，精确 macOS arm64 wheel | PyPI JSON 哈希与下载字节一致；分别 Apache-2.0 OR BSD-3-Clause、MIT-0、BSD-3-Clause；wheel notices 已保留 |
@@ -20,7 +20,9 @@
 
 ## 锁文件与校验
 
-- `dependencies/sources.lock.json`：8 套源树的确定性摘要、7 个源码归档/patch/Go 锁输入。已补丁快照依靠树摘要验证，revision 用于标识上游基线。
+- `dependencies/unicorn-macos-arm64.lock.json`：Mac 设备证明引擎 wheel 的固定 URL、归档哈希及动态库哈希，构建时获取并随包分发。
+
+- `dependencies/sources.lock.json`：9 套源树的确定性摘要、8 个源码归档/patch/Go/运行库锁输入。已补丁快照依靠树摘要验证，revision 用于标识上游基线。
 - `dependencies/go-modules.lock.json`：完整模块图及实际导入标记；原始 go.sum 继续负责下载校验。未下载模块没有 root notice 不表示上游没有许可。
 - `dependencies/python-runtime.lock.json`：standalone Python 构建、URL、SHA-256，校验值来源为固定 uv 0.12.9 元数据。
 - `dependencies/python-macos-arm64.lock.json` / `requirements-macos-arm64.lock`：精确 wheel 和 `--require-hashes`。

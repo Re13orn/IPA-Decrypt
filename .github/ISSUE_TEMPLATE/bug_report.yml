@@ -1,0 +1,58 @@
+name: Bug report / 问题反馈
+description: Report a reproducible defect with redacted diagnostics / 提交可复现缺陷
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        English and 简体中文 are welcome. For usage questions, use Discussions.
+        请勿上传密码、验证码、Cookie、会话文件、真实凭据或签名材料。
+        Do not upload passwords, verification codes, cookies, session files, real credentials, or signing material.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform / 平台
+      options:
+        - macOS
+        - iOS
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version / App 版本
+      placeholder: "macOS 1.0.9 (10), or iOS 1.0.3 (4)"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: OS and hardware / 系统与硬件
+      placeholder: "macOS version + Apple chip, or iPhone model + iOS version"
+    validations:
+      required: true
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Workflow / 操作来源
+      options:
+        - App Store
+        - TestFlight
+        - Local IPA / 本地 IPA
+        - Local Mac model / 本机模型
+        - Jailbroken device extraction / 越狱设备提取
+        - Installation or other / 安装或其他
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps and result / 操作步骤与结果
+      description: Include expected and actual behavior / 请说明预期与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostic
+    attributes:
+      label: Redacted diagnostic code / 脱敏诊断码
+      description: Paste the stage code only; review attachments for account data / 请仅填写阶段码，并检查附件中的账户信息

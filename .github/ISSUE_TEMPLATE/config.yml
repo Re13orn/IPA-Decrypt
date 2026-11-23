@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and ideas / 使用问题与功能建议
+    url: https://github.com/Re13orn/IPA-Decrypt/discussions
+    about: Ask questions and discuss workflows / 交流使用方式与改进建议
+  - name: FAQ / 常见问题
+    url: https://github.com/Re13orn/IPA-Decrypt/blob/main/docs/en/FAQ.md
+    about: Credentials, platform requirements, versions, and sessions / 凭据、系统要求、版本和会话
