@@ -84,3 +84,15 @@ USB 连接通过端口转发访问设备 SSH 服务；网络连接要求 Mac 与
 | IPA 解密失败 | 检查凭据与目标许可证的匹配结果，保留诊断阶段码 |
 
 反馈时请提供应用版本、系统版本、操作来源和脱敏诊断码。更多兼容性信息见 [已知问题](KNOWN_ISSUES.md) 与 [验证记录](PORTABILITY.md)。
+
+## Mac 设备证明运行库错误
+
+Mac 1.0.9 起随包提供 Unicorn 运行库，校验后从安装包准备缓存；首次初始化该引擎无需下载。Apple 登录、设备注册和下载仍需联网。
+
+| 诊断码 | 处理方式 |
+| --- | --- |
+| `login/runtime-bundle-missing` / `login/runtime-bundle-invalid` | 重新下载并校验安装包，退出后替换完整 App。 |
+| `login/runtime-cache-write` | 检查可用空间及当前用户缓存目录的写入权限。 |
+| `login/unicorn-link` / `login/unicorn-execution` / `login/unicorn-executable-memory` | 提供 App 版本、芯片、macOS 版本及完整诊断码；需继续排查动态加载或执行环境。 |
+
+旧版只有“初始化失败”提示时，先更新至 1.0.9 或更高版本。反馈时无需提供密码、验证码、会话文件或凭据内容。

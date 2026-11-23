@@ -1,0 +1,51 @@
+{
+  "release": "v1.0.9",
+  "macos": {
+    "version": "1.0.9",
+    "build": "10",
+    "architecture": "arm64",
+    "minimum_os": "15.0",
+    "packaged_mach_o_count": 24,
+    "local_system": "26.4.1",
+    "installed_launch": "passed",
+    "installed_signature": "passed"
+  },
+  "store_runtime": {
+    "engine": "Unicorn 2.1.4",
+    "archive_and_library_hashes": "pinned; verified at packaging and cache preparation",
+    "cache_tests": "passed; empty cache extraction, corrupt cache repair, invalid/missing archive rejection",
+    "offline_execution": "passed; fresh HOME, network denied, actual ARM64 instructions executed"
+  },
+  "checks": {
+    "offline_synthetic_suite": "passed",
+    "extractor_tests": 27,
+    "packaging_tests": 9,
+    "bundle_signature_after_execution": "passed",
+    "source_scan": "passed; bounded scan"
+  },
+  "macos15_runtime": {
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/45102738839",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "result": "passed",
+    "store_proof_empty_cache_offline": "passed",
+    "signature_after_execution": "passed",
+    "python_crypto": "passed",
+    "extractor_cli": "passed",
+    "usb_helpers": "passed",
+    "enrollment_helper": "passed"
+  },
+  "superseded_candidate": {
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/45102411631",
+    "result": "Rejected before publication: local smoke generated Python bytecode in the signed bundle; corrected with -B and post-execution signature verification."
+  },
+  "limits": [
+    "The feedback device and its complete diagnostic code were not available for reproduction.",
+    "No Apple account login, provisioning request, real SSH extraction or download acceptance was performed.",
+    "Only runtime initialization is offline; Apple authentication and downloads still require network access."
+  ],
+  "ios": {
+    "version": "1.0.3",
+    "status": "unchanged; linked from v1.0.7"
+  }
+}
