@@ -19,12 +19,12 @@ See the [credential guide](docs/en/CREDENTIALS.md) for setup and compatibility.
 
 | Platform | App version | Download | Requirements |
 | --- | --- | --- | --- |
-| macOS | **1.0.9** | [Apple Silicon DMG](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.9/IPA-Decrypt-macOS-1.0.9-arm64.dmg) | Apple Silicon · macOS 15+ |
-| iOS | **1.0.3** | [Unsigned IPA](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.7/IPA-Decrypt-iOS-1.0.3-unsigned.ipa) | iOS 16+ · valid signing required |
+| macOS | **1.1.0** | [Apple Silicon DMG](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.1.0/IPA-Decrypt-macOS-1.1.0-arm64.dmg) | Apple Silicon · macOS 15+ |
+| iOS | **1.0.4** | [Unsigned IPA](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.1.0/IPA-Decrypt-iOS-1.0.4-unsigned.ipa) | iOS 16+ · valid signing required |
 
 [All releases and checksums](https://github.com/Re13orn/IPA-Decrypt/releases) · [Installation guide](docs/en/INSTALLATION.md)
 
-Mac releases are ad-hoc signed and **not notarized**. See the installation guide for checksum verification and Apple's instructions for opening downloaded apps. iOS and Mac versions advance independently; the iOS 1.0.3 asset is hosted under release tag `v1.0.7`.
+Mac releases are ad-hoc signed and **not notarized**. See the installation guide for checksum verification and Apple's instructions for opening downloaded apps. iOS and Mac versions advance independently; both current packages are available under release tag `v1.1.0`.
 
 ## Screenshots
 

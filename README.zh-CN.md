@@ -19,12 +19,12 @@
 
 | 平台 | App 版本 | 安装包 | 系统要求 |
 | --- | --- | --- | --- |
-| macOS | **1.0.9** | [Apple Silicon DMG](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.9/IPA-Decrypt-macOS-1.0.9-arm64.dmg) | Apple Silicon · macOS 15+ |
-| iOS | **1.0.3** | [未签名 IPA](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.7/IPA-Decrypt-iOS-1.0.3-unsigned.ipa) | iOS 16+ · 安装前需有效签名 |
+| macOS | **1.1.0** | [Apple Silicon DMG](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.1.0/IPA-Decrypt-macOS-1.1.0-arm64.dmg) | Apple Silicon · macOS 15+ |
+| iOS | **1.0.4** | [未签名 IPA](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.1.0/IPA-Decrypt-iOS-1.0.4-unsigned.ipa) | iOS 16+ · 安装前需有效签名 |
 
 [所有版本与校验文件](https://github.com/Re13orn/IPA-Decrypt/releases) · [安装指南](docs/INSTALLATION.md)
 
-Mac 当前采用 ad-hoc 签名，**未公证**；文件校验和系统打开方式见安装指南。两端版本独立递增，iOS 1.0.3 安装包保留在发布标签 `v1.0.7` 下。
+Mac 当前采用 ad-hoc 签名，**未公证**；文件校验和系统打开方式见安装指南。两端版本独立递增，本次双端安装包均位于发布标签 `v1.1.0` 下。
 
 ## 界面预览
 

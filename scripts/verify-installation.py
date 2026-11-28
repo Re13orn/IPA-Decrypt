@@ -24,7 +24,7 @@ def inspect(app,platform,*,proof_lock=None):
   require(hashlib.sha256((runtime/name).read_bytes()).hexdigest()==digest,'Changed runtime: '+name)
  for name in ['index.html','ipalab.mjs']:require((runtime/name).is_file(),'Missing runtime entry: '+name)
  require(bool(plistlib.loads((resources/'Storefronts.plist').read_bytes())),'Storefront list empty')
- private={'accounts-v2.json','credentials-v2.json','accounts.json','credentials.json','jobs.json','passwords.json','beta.session','ipatool-state','ipatool-hardware'}
+ private={'accounts-v2.json','credentials-v2.json','accounts.json','credentials.json','jobs.json','processing-queue.json','passwords.json','beta.session','ipatool-state','ipatool-hardware'}
  for path in app.rglob('*'):
   require(path.name not in private,'User state included in app: '+path.name)
   if path.is_symlink():require(path.resolve().is_relative_to(app),'Symlink escapes bundle: '+path.name)

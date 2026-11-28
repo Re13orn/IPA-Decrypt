@@ -85,7 +85,7 @@ while queue:
         relative = os.path.relpath(dest, binary.parent)
         subprocess.run(['install_name_tool','-change',dependency,'@loader_path/' + relative,str(binary)], check=True)
 
-info = dict(CFBundleExecutable='IPADecryptMac', CFBundleIdentifier='local.ipadecrypt.mac', CFBundleName='IPA 解密', CFBundleDisplayName='IPA 解密', CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString='1.0.9', CFBundleVersion='10', LSMinimumSystemVersion='15.0', NSHighResolutionCapable=True, LSMultipleInstancesProhibited=True, NSPrincipalClass='NSApplication', NSLocalNetworkUsageDescription='允许局域网设备下载你主动分享的 IPA。', NSAppTransportSecurity=dict(NSAllowsLocalNetworking=True), CFBundleDocumentTypes=[dict(CFBundleTypeName='IPA 与 FairPlay 凭据',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['public.data'])])
+info = dict(CFBundleExecutable='IPADecryptMac', CFBundleIdentifier='local.ipadecrypt.mac', CFBundleName='IPA 解密', CFBundleDisplayName='IPA 解密', CFBundlePackageType='APPL', CFBundleIconFile='AppIcon', CFBundleShortVersionString='1.1.0', CFBundleVersion='11', LSMinimumSystemVersion='15.0', NSHighResolutionCapable=True, LSMultipleInstancesProhibited=True, NSPrincipalClass='NSApplication', NSLocalNetworkUsageDescription='允许局域网设备下载你主动分享的 IPA。', NSAppTransportSecurity=dict(NSAllowsLocalNetworking=True), CFBundleDocumentTypes=[dict(CFBundleTypeName='IPA 与 FairPlay 凭据',CFBundleTypeRole='Viewer',LSHandlerRank='Alternate',LSItemContentTypes=['public.data'])])
 (contents / 'Info.plist').write_bytes(plistlib.dumps(info))
 with tarfile.open(ROOT / 'apps/ios/Tools/ipatool/unicorn/unicorn-2.1.4.tgz') as source:
     for name in ['COPYING', 'COPYING.LGPL2', 'COPYING_GLIB', 'qemu/COPYING', 'qemu/COPYING.LIB', 'qemu/LICENSE']:
