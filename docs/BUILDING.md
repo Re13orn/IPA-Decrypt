@@ -121,7 +121,7 @@ python3 scripts/check-release.py --macos-app '/path/to/IPA 解密.app' --ios-ipa
 `.github/workflows/macos-compatibility.yml` 可手动指定 Release 标签，在 GitHub 的 macOS 15 / arm64 运行器上下载安装包，核对 DMG 校验值与签名，复制 App 后实际启动 SwiftUI 窗口，并检查包内 Python 加密模块、提取器命令行和 USB 工具。仅验证启动及离线组件，不使用 Apple 账户或真实设备。
 
 ```sh
-gh workflow run macos-compatibility.yml -f tag=v1.0.9
+gh workflow run macos-compatibility.yml -f tag=v1.1.0
 ```
 
 此流程应在发布草稿准备完成后运行，通过后再正式发布。完整业务流程和具体用户机器仍需分别验收。

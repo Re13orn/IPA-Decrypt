@@ -1,0 +1,56 @@
+{
+  "release": "v1.1.0",
+  "macos": {
+    "version": "1.1.0",
+    "build": "11",
+    "minimum_os": "15.0",
+    "architecture": "arm64",
+    "mach_o_checked": 24,
+    "local_smoke": {
+      "signature_after_execution": "passed",
+      "system": "26.4.1",
+      "architecture": "arm64",
+      "launch": "passed",
+      "store_proof_empty_cache_offline": "passed",
+      "python_crypto": "passed",
+      "extractor_cli": "passed",
+      "usb_helpers": "passed",
+      "enrollment_helper": "passed",
+      "scope": "Packaged app startup and offline helper checks; no Apple account, download, device SSH or decryption acceptance"
+    },
+    "mounted_dmg_resource_and_signature_checks": "passed"
+  },
+  "ios": {
+    "version": "1.0.4",
+    "build": "5",
+    "minimum_os": "16.0",
+    "device_release_build": "passed",
+    "unsigned_ipa_resource_and_zip_checks": "passed"
+  },
+  "macos15_runtime": {
+    "workflow": "https://github.com/Re13orn/IPA-Decrypt/actions/runs/46117799791",
+    "system": "15.8.2",
+    "architecture": "arm64",
+    "result": "passed",
+    "launch": "passed",
+    "store_proof_empty_cache_offline": "passed",
+    "python_crypto": "passed",
+    "extractor_cli": "passed",
+    "usb_helpers": "passed",
+    "enrollment_helper": "passed",
+    "signature_after_execution": "passed"
+  },
+  "checks": {
+    "offline_synthetic_suite": "passed",
+    "packaging_tests": 7,
+    "release_input_tests": 3,
+    "source_scan": "passed; bounded scan",
+    "native_ui": "passed; synthetic isolated Mac preview, search/details, preparation, credential and account handoff, mode preservation, queue pause/restart/cancel/retry, six-digit input/paste/backspace/Return"
+  },
+  "limits": [
+    "No fresh physical device installation acceptance was performed.",
+    "Real account end-to-end testing was reported by the maintainer; this packaging pass did not repeat authentication, real downloads, SSH extraction or decryption.",
+    "iOS UI changes passed a device Release build; the six-digit interaction smoke was run on macOS with synthetic codes.",
+    "Mac is ad-hoc signed and not notarized; iOS IPA is unsigned."
+  ]
+}

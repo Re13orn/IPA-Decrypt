@@ -6,10 +6,10 @@
 
 | Platform | Version | Download | Requirements |
 | --- | --- | --- | --- |
-| macOS | 1.0.9 | [Apple Silicon DMG](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.9/IPA-Decrypt-macOS-1.0.9-arm64.dmg) | Apple Silicon · macOS 15+ |
-| iOS | 1.0.3 | [Unsigned IPA](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.7/IPA-Decrypt-iOS-1.0.3-unsigned.ipa) | iOS 16+ · valid signing required |
+| macOS | 1.1.0 | [Apple Silicon DMG](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.1.0/IPA-Decrypt-macOS-1.1.0-arm64.dmg) | Apple Silicon · macOS 15+ |
+| iOS | 1.0.4 | [Unsigned IPA](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.1.0/IPA-Decrypt-iOS-1.0.4-unsigned.ipa) | iOS 16+ · valid signing required |
 
-The two apps have independent version numbers. The iOS asset is retained in release `v1.0.7`; the Mac-only `v1.0.9` release links to it.
+The two apps have independent version numbers. Both current packages are included in release `v1.1.0`.
 
 ## Verify downloads
 
@@ -17,10 +17,10 @@ Download the asset and its release's `SHA256SUMS`. To verify a single file from 
 
 ```sh
 # Run in the download directory, with the checksum file for this release.
-grep 'IPA-Decrypt-macOS-1.0.9-arm64.dmg$' SHA256SUMS | shasum -a 256 -c -
+grep 'IPA-Decrypt-macOS-1.1.0-arm64.dmg$' SHA256SUMS | shasum -a 256 -c -
 ```
 
-For iOS, use the checksum file from `v1.0.7` and select `IPA-Decrypt-iOS-1.0.3-unsigned.ipa` instead.
+For iOS, use the checksum file from `v1.1.0` and select `IPA-Decrypt-iOS-1.0.4-unsigned.ipa` instead.
 
 ## macOS
 

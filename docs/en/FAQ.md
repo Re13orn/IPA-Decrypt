@@ -22,9 +22,9 @@ No. The iOS hex importer expects exactly 16 bytes represented as 32 hex characte
 
 The service rejected the saved session. Reauthenticate through the TestFlight account settings, then reload the list. An App Store account selection does not change the independently selected TestFlight account. A 401 response is not evidence that the account has no joined tests.
 
-## Why is iOS 1.0.3 linked to release tag v1.0.7?
+## Why do Mac and iOS have different version numbers?
 
-Mac and iOS versions advance independently. The iOS 1.0.3 asset was included in `v1.0.7` and has not changed in subsequent Mac-only releases. The README links directly to each platform's named asset.
+Mac and iOS versions advance independently according to each platform's changes. Release `v1.1.0` includes Mac 1.1.0 and iOS 1.0.4. The README links directly to each platform's named asset.
 
 ## Why is the Mac app not notarized?
 

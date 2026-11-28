@@ -75,7 +75,7 @@ The offline suite uses synthetic data. The Mac smoke check launches the packaged
 The [macOS compatibility workflow](../../.github/workflows/macos-compatibility.yml) can validate a candidate release on macOS 15 / arm64:
 
 ```sh
-gh workflow run macos-compatibility.yml -f tag=v1.0.9
+gh workflow run macos-compatibility.yml -f tag=v1.1.0
 ```
 
 Use a prepared draft release, review the result, and publish after checks pass. Package and component checks do not replace first-install acceptance on physical hardware. See [validation records](../PORTABILITY.md).

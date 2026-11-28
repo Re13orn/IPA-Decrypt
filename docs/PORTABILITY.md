@@ -9,7 +9,7 @@
 | macOS | Apple Silicon · macOS 15+ | Release 编译、24 个 Mac 二进制检查；macOS 15.8.2 / arm64 云端启动及离线组件验证通过 |
 | iOS | iOS 16+ | Release 编译、真机二进制平台及资源检查通过 |
 
-iOS 真机安装需要适用于目标设备的有效签名。实体新设备上的完整登录、下载、解密与分享流程仍待验收。
+iOS 真机安装需要适用于目标设备的有效签名。本轮已验证 Mac 搜索、下载准备、凭据返回、队列恢复与验证码交互；使用隔离目录和合成文件。维护者已反馈真实账户完整流程测试通过，本轮打包未重复该测试；实体新设备验收仍未执行。
 
 ## 越狱设备 SSH 验证
 
@@ -25,7 +25,7 @@ Mac 1.0.2 在本机 Apple Silicon / macOS 26.4.1 完成实际系统授权、注�
 
 ## macOS 15 运行验证
 
-[GitHub Actions 验证任务](https://github.com/Re13orn/IPA-Decrypt/actions/runs/45102738839) 在 macOS 15.8.2 / arm64 上下载并校验最终 DMG，复制 App 后检查签名及资源、实际启动 SwiftUI 界面，在空 HOME 且禁止网络的子进程中执行设备证明引擎，并复核运行后的签名；同时验证 Python 加密模块、提取器 CLI、三个 USB 工具及本机模型组件。
+[GitHub Actions 验证任务](https://github.com/Re13orn/IPA-Decrypt/actions/runs/46117799791) 在 macOS 15.8.2 / arm64 上下载并校验最终 DMG，复制 App 后检查签名及资源、实际启动 SwiftUI 界面，在空 HOME 且禁止网络的子进程中执行设备证明引擎，并复核运行后的签名；同时验证 Python 加密模块、提取器 CLI、三个 USB 工具及本机模型组件。
 
 该结果不代表已完成用户反馈设备的 macOS 15.6.1 验收，也不覆盖账户登录、下载和真实设备解密。
 

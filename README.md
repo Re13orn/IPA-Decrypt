@@ -87,7 +87,7 @@ Mac models and 16-byte credentials are different formats. Models cannot be conve
 
 ## Compatibility and validation
 
-The Mac 1.0.9 package passed macOS 15 / arm64 startup, bundled helper checks, and actual ARM64 proof-engine execution with an empty cache and networking denied. The signature is checked again after execution. Apple authentication and downloads still require network access.
+The Mac 1.1.0 package passed macOS 15 / arm64 startup, bundled helper checks, and actual ARM64 proof-engine execution with an empty cache and networking denied. The signature is checked again after execution. Apple authentication and downloads still require network access.
 
 iOS releases are unsigned device builds. A complete first-install workflow on a new physical device remains to be accepted. TestFlight uses a non-public client protocol and may be affected by Apple service changes.
 

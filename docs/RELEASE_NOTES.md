@@ -22,3 +22,7 @@ macOS **1.1.0 (11)** · iOS **1.0.4 (5)**
 - 源码：`IPA-Decrypt-1.1.0-source.zip`；文件校验值：`SHA256SUMS`。
 
 Mac 安装包采用 ad-hoc 签名，未公证。队列暂停在当前步骤完成后生效，取消待执行项不会删除已保存文件。iOS 不包含 Mac 专属任务队列。
+
+## 验证
+
+双端 Release 构建、离线测试与安装资源检查通过；最终 Mac DMG 已通过 macOS 15.8.2 / arm64 启动、空缓存离线运行库执行及签名复核。详见 [验证记录](https://github.com/Re13orn/IPA-Decrypt/blob/main/docs/validation/2026-11-28-v1.1.0.json)。
