@@ -40,6 +40,7 @@ enum ExtractorProcess {
     @ObservedObject var model: LocalLab
     let viewCredential: (UUID) -> Void
     let useCredentials: () -> Void
+    var continuationTitle: String? = nil
     @State private var devices: [JailbreakDevice] = []
     @AppStorage("device-selected-udid") private var selected = ""
     @AppStorage("device-connection-mode") private var mode = "usb"
@@ -232,7 +233,7 @@ enum ExtractorProcess {
                     HStack {
                         Text("已保存：" + record.displayName)
                         Button("查看凭据") { viewCredential(record.id) }.disabled(busy || testing)
-                        Button("选择 IPA 解密", action: useCredentials).disabled(busy || testing)
+                        Button(continuationTitle ?? "选择 IPA 解密", action: useCredentials).disabled(busy || testing)
                         Button("导出 credential.bin…") { exportData(record.data) }
                         Button("复制十六进制") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(record.hex, forType: .string) }
                     }
@@ -252,7 +253,7 @@ enum ExtractorProcess {
                 }
                 if let status { Label(status, systemImage: succeeded ? "checkmark.circle.fill" : "info.circle").foregroundStyle(succeeded ? Color.green : .secondary).textSelection(.enabled) }
                 if !confirmedGroups.isEmpty && selectedCredential == nil {
-                    Button("选择 IPA 解密", systemImage: "lock.open", action: useCredentials).disabled(busy || testing)
+                    Button(continuationTitle ?? "选择 IPA 解密", systemImage: "lock.open", action: useCredentials).disabled(busy || testing)
                 }
                 if let output { HStack { Button("导出 credential.bin…") { export(output) }; Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([output]) } } }
             }

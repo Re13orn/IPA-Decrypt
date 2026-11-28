@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Nested sheets (for example, credential import) belong to child views, so
 /// workspace commands must also respect the actual window's modal state.
-@MainActor private final class MacCommandContext: ObservableObject {
+@MainActor final class MacCommandContext: ObservableObject {
     static let shared = MacCommandContext()
     @Published private(set) var modal = false
     private var observers: [NSObjectProtocol] = []

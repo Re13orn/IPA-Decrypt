@@ -170,6 +170,7 @@ struct AccountBook: Codable {
     private var storeResendReply: StoreReply?
     private var deliveryCredentials: (email: String, password: String)?
     private let folder: URL
+    lazy var taskQueue = MacProcessingQueue(model: self, file: folder.appendingPathComponent("processing-queue.json"))
     private struct PendingBetaLogin {
         var profile: AppleProfile
         let device: Device
@@ -1219,7 +1220,8 @@ struct AccountBook: Codable {
         return reply.displayVersion
     }
 
-    func download(_ app: AppResult, version: String? = nil, replacing previous: LocalJob? = nil) async throws {
+    @discardableResult func download(_ app: AppResult, version: String? = nil, replacing previous: LocalJob? = nil,
+                                    automaticallyDecrypt: Bool = true) async throws -> LocalJob {
         guard activeProfile(beta: false) != nil else { throw LabError("请先登录 App Store。") }
         let job = try create(app.trackName, source: .store, state: .downloading, version: version,
                              storeApp: app, replacing: previous)
@@ -1229,14 +1231,16 @@ struct AccountBook: Codable {
             try acceptStore(try await sendStore("download", query: app.trackName, bundle: app.bundleId,
                                                id: app.id, path: path(for: job, clear: false).path, version: version ?? ""))
             stopTracking(job.id, task: tracker)
-            try await received(job)
+            try await received(job, automaticallyDecrypt: automaticallyDecrypt)
+            return jobs.first(where: { $0.id == job.id }) ?? job
         } catch {
             set(job.id, .failed, friendly(error))
             throw error
         }
     }
 
-    func downloadBeta(_ title: String, bundle: String, replacing previous: LocalJob? = nil) async throws {
+    @discardableResult func downloadBeta(_ title: String, bundle: String, replacing previous: LocalJob? = nil,
+                                        automaticallyDecrypt: Bool = true) async throws -> LocalJob {
         guard LocalJob.isBundleID(bundle) else {
             throw LabError("请输入有效的 Bundle ID。")
         }
@@ -1248,7 +1252,8 @@ struct AccountBook: Codable {
             let client = try await testFlight()
             _ = try await client.download(bundle: bundle, to: path(for: job, clear: false))
             stopTracking(job.id, task: tracker)
-            try await received(job)
+            try await received(job, automaticallyDecrypt: automaticallyDecrypt)
+            return jobs.first(where: { $0.id == job.id }) ?? job
         } catch {
             set(job.id, .failed, friendly(error))
             throw error
@@ -1285,7 +1290,8 @@ struct AccountBook: Codable {
         downloads.removeValue(forKey: id)
     }
 
-    func importIPA(_ url: URL, replacing previous: LocalJob? = nil) async throws {
+    @discardableResult func importIPA(_ url: URL, replacing previous: LocalJob? = nil,
+                                     automaticallyDecrypt: Bool = true) async throws -> LocalJob {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         let job = try create(url.deletingPathExtension().lastPathComponent, source: .local, state: .imported,
@@ -1295,21 +1301,22 @@ struct AccountBook: Codable {
             try await Task.detached(priority: .userInitiated) {
                 try FileManager.default.copyItem(at: url, to: destination)
             }.value
-            try await received(job)
+            try await received(job, automaticallyDecrypt: automaticallyDecrypt)
+            return jobs.first(where: { $0.id == job.id }) ?? job
         } catch {
             set(job.id, .failed, friendly(error))
             throw error
         }
     }
 
-    private func received(_ job: LocalJob) async throws {
+    private func received(_ job: LocalJob, automaticallyDecrypt: Bool = true) async throws {
         guard FairPlay.isCompleteIPA(path(for: job, clear: false)) else {
             throw LabError("下载或导入的原包不完整，或不是有效的 IPA。请重新下载或导入。")
         }
         if let index = jobs.firstIndex(where: { $0.id == job.id }) { jobs[index].originalComplete = true }
         set(job.id, .imported)
         let receivedJob = jobs.first(where: { $0.id == job.id }) ?? job
-        if hasCredentials(for: receivedJob) { try await decrypt(receivedJob) }
+        if automaticallyDecrypt && hasCredentials(for: receivedJob) { try await decrypt(receivedJob) }
     }
 
     func decrypt(_ job: LocalJob) async throws {

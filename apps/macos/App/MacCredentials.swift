@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
     let extractLocal: () -> Void
     let extractDevice: () -> Void
     let useCredentials: () -> Void
+    var continuationTitle: String? = nil
     @State private var query = ""
     @State private var importing = false
     @State private var pendingFile: URL?
@@ -34,7 +35,7 @@ import UniformTypeIdentifiers
                     Button("从这台 Mac 提取模型", systemImage: "desktopcomputer", action: extractLocal)
                     Button("从越狱设备提取凭据", systemImage: "iphone.and.arrow.forward", action: extractDevice)
                 }
-                if !model.credentials.isEmpty { Button(model.jobs.isEmpty ? "下载或导入 IPA" : "选择 IPA 解密", systemImage: "lock.open", action: useCredentials) }
+                if !model.credentials.isEmpty { Button(continuationTitle ?? (model.jobs.isEmpty ? "下载或导入 IPA" : "选择 IPA 解密"), systemImage: "lock.open", action: useCredentials) }
                 Button("导入已有凭据", systemImage: "plus") { pendingFile = nil; importing = true }.buttonStyle(.borderedProminent)
             }.padding()
             Divider()

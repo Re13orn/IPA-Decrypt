@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
     @ObservedObject var model: LocalLab
     let viewCredential: (UUID) -> Void
     let useCredentials: () -> Void
+    var continuationTitle: String? = nil
     @State private var savedID: UUID?
     @State private var apps: [InstalledMacIOSApp] = []
     @State private var selected: String?
@@ -57,7 +58,7 @@ import UniformTypeIdentifiers
             if let savedID {
                 Section("3. 用于解密") {
                     HStack {
-                        Button(model.jobs.isEmpty ? "下载 IPA" : "选择 IPA 解密", systemImage: "lock.open", action: useCredentials).buttonStyle(.borderedProminent)
+                        Button(continuationTitle ?? (model.jobs.isEmpty ? "下载 IPA" : "选择 IPA 解密"), systemImage: "lock.open", action: useCredentials).buttonStyle(.borderedProminent)
                         Button("查看已保存模型") { viewCredential(savedID) }
                     }
                     Text("下载或导入 IPA 后自动尝试匹配；已有文件可在处理记录中继续解密。").font(.caption).foregroundStyle(.secondary)

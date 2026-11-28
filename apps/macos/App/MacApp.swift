@@ -59,6 +59,10 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
 
 @MainActor struct MacWorkspace: View {
     @ObservedObject var model: LocalLab
+    @ObservedObject var queue: MacProcessingQueue
+    @ObservedObject private var modalContext = MacCommandContext.shared
+    @State private var workspaceVerification = false
+    init(model: LocalLab) { self.model = model; self.queue = model.taskQueue }
     @State private var page: MacPage? = .store
     @State private var query = ""
     @State private var results: [AppResult] = []
@@ -66,8 +70,19 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var resultTerm = ""
     @State private var searchProblem: String?
     @State private var searchRequest = LatestViewRequest()
+    @State private var searchLoading = false
+    @State private var catalogTask: Task<Void, Never>?
     @State private var feedback: String?
-    @State private var queuedIPA: [URL] = []
+    @State private var downloadPreparation: MacDownloadPlan?
+    private enum PreparationAction { case credentials(MacDownloadPlan), accounts(MacDownloadPlan) }
+    private enum CredentialReturn {
+        case download(MacDownloadPlan), job(UUID, String)
+        var name: String { switch self { case .download(let plan): return plan.name; case .job(_, let name): return name } }
+    }
+    @State private var preparationAction: PreparationAction?
+    @State private var planAfterLogin: MacDownloadPlan?
+    @State private var planAfterVersion: MacDownloadPlan?
+    @State private var credentialReturn: CredentialReturn?
     @State private var historyQuery = ""
     @State private var historyFilter: JobListFilter = .all
     @State private var testsLoaded = false
@@ -93,6 +108,36 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var focusStoreOnAppear = false
 
     var body: some View {
+        workspaceWithPresentations
+        .focusedSceneValue(\.macWorkspaceActions, MacWorkspaceActions(
+            navigate: { if !deviceBusy { page = $0 } },
+            find: focusSearch, refresh: refreshPage, importIPA: importIPA,
+            canNavigate: !deviceBusy && !presentingSheet,
+            canRefresh: !presentingSheet && ((page == .store && !searchLoading && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || (page == .beta && model.action == nil && model.betaConnected)),
+            canImport: !presentingSheet && !deviceBusy))
+        .onChange(of: model.accounts.activeBeta) { tests = []; testsLoaded = false; testsProblem = nil; testsNeedReauth = false }
+        .onChange(of: model.country) {
+            catalogTask?.cancel(); searchRequest.invalidate(); searchLoading = false
+            results = []; selectedApp = nil; searched = false; searchProblem = nil
+        }
+        .onDisappear { catalogTask?.cancel() }
+        .onChange(of: model.askingCode) { updateVerificationPresentation() }
+        .onChange(of: modalContext.modal) { updateVerificationPresentation() }
+        .onChange(of: model.action) { continueWhenIdle() }
+        .onChange(of: presentingSheet) { continueWhenIdle() }
+        .onOpenURL { url in
+            guard ["ipa", "bin"].contains(url.pathExtension.lowercased()) else { return }
+            guard !presentingSheet && NSApp.keyWindow?.sheetParent == nil && NSApp.keyWindow?.attachedSheet == nil else {
+                model.message = "请先完成或关闭当前窗口，再打开此文件。"; return
+            }
+            if url.pathExtension.lowercased() == "ipa" {
+                queue.enqueueImport(url); showHistory()
+                feedback = queue.storageProblem ?? "已加入导入队列。"
+            } else if model.action == nil { incomingCredential = url; page = .credentials }
+            else { model.message = "请等待当前任务完成后，再打开凭据文件。" }
+        }
+    }
+    private var workspaceLayout: some View {
         NavigationSplitView {
             List(selection: $page) {
                 Section("获取与处理") {
@@ -103,7 +148,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 }
                 Section {
                     Button("导入本地 IPA…", systemImage: "square.and.arrow.down") { importIPA() }
-                        .buttonStyle(.plain).disabled(model.action != nil)
+                        .buttonStyle(.plain).disabled(deviceBusy)
                 }
             }.disabled(deviceBusy).listStyle(.sidebar).navigationTitle("IPA 解密")
             .navigationSplitViewColumnWidth(min: 210, ideal: 225, max: 260)
@@ -113,11 +158,25 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 case .store: storeView
                 case .beta: betaView
                 case .history: historyView
-                case .credentials: MacCredentials(model: model, incomingFile: $incomingCredential, selected: $selectedCredential, extractLocal: { page = .enrollment }, extractDevice: { page = .device }, useCredentials: continueWithCredentials)
-                case .enrollment: MacEnrollmentView(model: model, viewCredential: openCredential, useCredentials: continueWithCredentials)
-                case .device: CredentialExtractionView(model: model, viewCredential: openCredential, useCredentials: continueWithCredentials)
+                case .credentials: MacCredentials(model: model, incomingFile: $incomingCredential, selected: $selectedCredential, extractLocal: { page = .enrollment }, extractDevice: { page = .device }, useCredentials: continueWithCredentials, continuationTitle: credentialReturn == nil ? nil : "继续原任务")
+                case .enrollment: MacEnrollmentView(model: model, viewCredential: openCredential, useCredentials: continueWithCredentials, continuationTitle: credentialReturn == nil ? nil : "继续原任务")
+                case .device: CredentialExtractionView(model: model, viewCredential: openCredential, useCredentials: continueWithCredentials, continuationTitle: credentialReturn == nil ? nil : "继续原任务")
                 }
             }.navigationTitle((page ?? .store).rawValue)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let target = credentialReturn {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("继续处理：" + target.name).font(.callout.weight(.medium))
+                            Text(model.credentials.isEmpty ? "从本机提取、越狱设备提取或导入已有凭据。" : "凭据已准备，可返回原任务按许可证验证。").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("继续原任务", action: continueWithCredentials).buttonStyle(.borderedProminent)
+                            .disabled(model.credentials.isEmpty || deviceBusy)
+                        Button("取消返回") { credentialReturn = nil }.buttonStyle(.borderless)
+                    }.padding(12).background(.bar)
+                }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let feedback {
                     HStack(spacing: 10) {
@@ -144,6 +203,9 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 }
             }
         }
+    }
+    private var workspaceWithPresentations: some View {
+        workspaceLayout
         .sheet(item: $detail, onDismiss: continueDetailAction) { selected in
             NavigationStack {
                 AppDetailView(model: model, selection: selected,
@@ -153,14 +215,31 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     .toolbar { ToolbarItem { Button("关闭") { detail = nil }.keyboardShortcut(.cancelAction) } }
             }.frame(width: 860, height: 760)
         }
-        .sheet(isPresented: $login, onDismiss: resumeStoreRequest) { MacAccounts(model: model, beta: $loginBeta) }
+        .sheet(item: $downloadPreparation, onDismiss: continuePreparation) { plan in
+            MacDownloadPreparation(model: model, plan: plan, enqueue: { decrypt in
+                guard let owner = model.activeProfile(beta: plan.beta)?.owner else { return }
+                let added = queue.enqueue(plan.operation(owner: owner, decrypt: decrypt))
+                feedback = added ? "已加入任务队列。" : (queue.storageProblem ?? "队列中已有相同任务。")
+                credentialReturn = nil; downloadPreparation = nil; showHistory()
+            }, credentials: { decrypt in
+                var next = plan; next.decryptAfterwards = decrypt
+                preparationAction = .credentials(next); downloadPreparation = nil
+            }, accounts: { decrypt in
+                var next = plan; next.decryptAfterwards = decrypt
+                preparationAction = .accounts(next); downloadPreparation = nil
+            }, cancel: { downloadPreparation = nil })
+        }
+        .sheet(isPresented: $login, onDismiss: resumeAccountActions) { MacAccounts(model: model, beta: $loginBeta) }
         .onChange(of: model.storeConnected) { if model.storeConnected && pendingStoreRequest != nil && login { login = false } }
-        .sheet(isPresented: Binding(get: { model.askingCode && !login && version == nil && detail == nil }, set: { if !$0 { model.finishCode(nil) } }), onDismiss: { model.finishCode(nil) }) {
+        .sheet(isPresented: $workspaceVerification, onDismiss: { model.finishCode(nil) }) {
             MacVerification(model: model)
         }
-        .sheet(item: $version) { selection in
+        .sheet(item: $version, onDismiss: {
+            if let plan = planAfterVersion { planAfterVersion = nil; downloadPreparation = plan }
+        }) { selection in
             MacVersionPicker(model: model, selection: selection) { value in
-                version = nil; download(selection.app, version: value)
+                planAfterVersion = MacDownloadPlan(name: selection.app.trackName, app: selection.app, version: value)
+                version = nil
             }
             .sheet(isPresented: Binding(get: { model.askingCode }, set: { if !$0 { model.finishCode(nil) } }),
                    onDismiss: { model.finishCode(nil) }) { MacVerification(model: model) }
@@ -181,30 +260,6 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
         .confirmationDialog("删除记录及其 IPA 文件？", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
             Button("删除", role: .destructive) { if let removing { do { try model.removeJob(removing) } catch { model.message = model.friendly(error) } }; removing = nil }
         }
-        .focusedSceneValue(\.macWorkspaceActions, MacWorkspaceActions(
-            navigate: { if !deviceBusy { page = $0 } },
-            find: focusSearch, refresh: refreshPage, importIPA: importIPA,
-            canNavigate: !deviceBusy && !presentingSheet,
-            canRefresh: !presentingSheet && model.action == nil && ((page == .store && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || (page == .beta && model.betaConnected)),
-            canImport: !presentingSheet && model.action == nil))
-        .onChange(of: model.accounts.activeBeta) { tests = []; testsLoaded = false; testsProblem = nil; testsNeedReauth = false }
-        .onChange(of: model.country) {
-            searchRequest.invalidate(); results = []; selectedApp = nil; searched = false; searchProblem = nil
-        }
-        .onChange(of: model.action) { continueWhenIdle() }
-        .onChange(of: presentingSheet) { continueWhenIdle() }
-        .onOpenURL { url in
-            guard ["ipa", "bin"].contains(url.pathExtension.lowercased()) else { return }
-            guard !presentingSheet && NSApp.keyWindow?.sheetParent == nil && NSApp.keyWindow?.attachedSheet == nil else {
-                model.message = "请先完成或关闭当前窗口，再打开此文件。"; return
-            }
-            if url.pathExtension.lowercased() == "ipa" {
-                queuedIPA.append(url)
-                if model.action == nil { importNextQueuedIPA() }
-                else { feedback = "已加入导入队列，当前任务完成后继续。" }
-            } else if model.action == nil { incomingCredential = url; page = .credentials }
-            else { model.message = "请等待当前任务完成后，再打开凭据文件。" }
-        }
     }
     private var storeView: some View {
         VStack(spacing: 0) {
@@ -212,8 +267,8 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 TextField("名称、App ID、Bundle ID 或商店链接", text: $query)
                     .textFieldStyle(.roundedBorder).focused($searchFocus, equals: .store)
                     .onSubmit(search).accessibilityLabel("搜索 App Store")
-                if model.action == "正在搜索" { ProgressView().controlSize(.small).accessibilityLabel("正在搜索") }
-                Button("搜索", action: search).disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.action != nil)
+                if searchLoading { ProgressView().controlSize(.small).accessibilityLabel("正在搜索") }
+                Button("搜索", action: search).disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || searchLoading)
                 Menu {
                     Button("自动 · " + Storefronts.name(model.automaticCountry)) { model.region = "" }
                     Divider()
@@ -221,7 +276,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                         Button(Storefronts.name(country)) { model.region = country }
                     }
                 } label: { Label(Storefronts.name(model.country), systemImage: "globe") }
-                .disabled(model.action != nil)
+                .disabled(searchLoading)
             }.padding()
             Divider()
             if model.storeNeedsReauth {
@@ -239,10 +294,10 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 HStack(spacing: 12) {
                     Label(searchProblem, systemImage: "exclamationmark.circle").font(.callout).textSelection(.enabled)
                     Spacer()
-                    Button("重试", action: search).disabled(model.action != nil)
+                    Button("重试", action: search).disabled(searchLoading)
                 }.padding(12).background(Color.orange.opacity(0.08))
             }
-            if model.action == "正在搜索" && results.isEmpty { Spacer(); ProgressView("正在搜索 App Store…"); Spacer() }
+            if searchLoading && results.isEmpty { Spacer(); ProgressView("正在搜索 App Store…"); Spacer() }
             else if results.isEmpty { ContentUnavailableView(searched ? "未找到应用" : "查找 App Store 应用", systemImage: "magnifyingglass", description: Text(searched ? "请尝试其他名称、应用链接或商店地区。" : "输入应用名称、App ID、Bundle ID 或 App Store 链接。"))
                 .frame(maxWidth: .infinity, maxHeight: .infinity) }
             else {
@@ -256,7 +311,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                         Button { detail = AppSelection(app: app, country: model.country) } label: { AppListingLabel(app: app) }
                             .buttonStyle(.plain).accessibilityLabel("查看详情，\(app.trackName)")
                         Button("下载 IPA") { requestStore(app, kind: .latest) }
-                            .help("下载最新版 \(app.trackName)").disabled(model.action != nil)
+                            .help("下载最新版 \(app.trackName)")
                         Menu {
 
                             Button("最新版本") { requestStore(app, kind: .latest) }
@@ -270,7 +325,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     .contextMenu {
                         Button("查看详情") { detail = AppSelection(app: app, country: model.country) }
                         Divider()
-                        Button("下载最新版本") { requestStore(app, kind: .latest) }.disabled(model.action != nil)
+                        Button("下载最新版本") { requestStore(app, kind: .latest) }
                         Button("选择历史版本…") { requestStore(app, kind: .versions) }.disabled(model.action != nil)
                         Button("复制 Bundle ID") {
                             NSPasteboard.general.clearContents()
@@ -333,7 +388,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                         Image(systemName: "app.badge").font(.title2).foregroundStyle(.secondary).frame(width: 44, height: 44)
                         VStack(alignment: .leading, spacing: 4) { Text(app.name).font(.headline); Text(app.id).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
                         Spacer()
-                        Button("下载 IPA") { showHistory(); run("正在下载测试版") { try await model.downloadBeta(app.name, bundle: app.id) } }.disabled(model.action != nil)
+                        Button("下载 IPA") { downloadPreparation = MacDownloadPlan(name: app.name, bundle: app.id) }
                     }.padding(.vertical, 8)
                 }
             }
@@ -344,6 +399,10 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     private var visibleJobs: [LocalJob] { model.jobs.filter { historyFilter.includes($0, query: historyQuery) } }
     private var historyView: some View {
         VStack(spacing: 0) {
+            if !queue.operations.isEmpty || queue.storageProblem != nil {
+                MacQueuePanel(model: model, queue: queue, prepareCredentials: prepareCredentials, manageAccount: manageQueueAccount)
+                Divider()
+            }
             HStack(spacing: 12) {
                 TextField("搜索名称、版本或 Bundle ID", text: $historyQuery).textFieldStyle(.roundedBorder)
                     .accessibilityLabel("搜索处理记录").focused($searchFocus, equals: .history)
@@ -368,6 +427,8 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     Text(job.source + (job.version.map { " · " + $0 } ?? "")).font(.caption).foregroundStyle(.secondary)
                     if let account = job.credentialOwner { Text("下载账户 · " + account).font(.caption).foregroundStyle(.secondary) }
                     if let progress = model.downloads[job.id] {
+                        Text(progress.preparingPackage ? "正在整理 IPA 文件…" : progress.transferring ? "正在下载原包…" : "正在获取下载信息…")
+                            .font(.caption).foregroundStyle(.secondary)
                         ProgressView(value: progress.fraction)
                         Text(ByteCountFormatter.string(fromByteCount: progress.received, countStyle: .file) + (progress.total > 0 ? " / " + ByteCountFormatter.string(fromByteCount: progress.total, countStyle: .file) : "")).font(.caption.monospacedDigit())
                     }
@@ -375,7 +436,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     if model.artifact(job, clear: false) != nil && model.artifact(job, clear: true) == nil && !model.hasCredentials(for: job) {
                         HStack {
                             Label("导入匹配的 FairPlay 凭据后可解密。", systemImage: "key").foregroundStyle(.secondary)
-                            Button("管理凭据") { page = .credentials }
+                            Button("获取凭据并继续") { prepareCredentials(job) }
                         }.font(.callout)
                     }
                     historyActions(job)
@@ -387,10 +448,10 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     private func historyActions(_ job: LocalJob) -> some View {
         HStack(spacing: 10) {
             if let decrypted = model.artifact(job, clear: true) {
-                Button("导出解密版", systemImage: "square.and.arrow.up") { export(decrypted) }.buttonStyle(.borderedProminent)
+                Button("导出解密版", systemImage: "square.and.arrow.up") { export(decrypted) }.buttonStyle(.borderedProminent).disabled(model.action != nil)
             } else if model.artifact(job, clear: false) != nil {
                 if model.hasCredentials(for: job) {
-                    Button(job.state == .failed ? "重试解密" : "解密 IPA", systemImage: "lock.open") { run("正在解密 IPA") { try await model.decrypt(job) } }.buttonStyle(.borderedProminent)
+                    Button(job.state == .failed ? "重试解密" : "解密 IPA", systemImage: "lock.open") { queue.enqueueDecryption(job) }.buttonStyle(.borderedProminent)
                 }
             } else if job.state == .failed, let app = job.storeApp {
                 if job.needsStoreLicense && app.price == 0 {
@@ -400,8 +461,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 }
             } else if job.state == .failed, let bundle = job.retryBetaBundle {
                 Button("重新下载", systemImage: "arrow.clockwise") {
-                    if model.betaConnected { showHistory(); run("正在重新下载测试版") { try await model.downloadBeta(job.name, bundle: bundle, replacing: job) } }
-                    else { loginBeta = true; login = true }
+                    downloadPreparation = MacDownloadPlan(name: job.name, bundle: bundle, replacing: job)
                 }
             }
             Menu("更多操作") {
@@ -409,20 +469,48 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 if let decrypted = model.artifact(job, clear: true) {
                     Button("网页下载") { share(decrypted) }
                     Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([decrypted]) }
-                    if model.hasCredentials(for: job) { Button("重新解密") { run("正在解密 IPA") { try await model.decrypt(job) } } }
+                    if model.hasCredentials(for: job) { Button("重新解密") { queue.enqueueDecryption(job) } }
                 }
-                Button("管理凭据") { page = .credentials }
+                if let original = model.artifact(job, clear: false) {
+                    Button("在 Finder 中显示原包") { NSWorkspace.shared.activateFileViewerSelecting([original]) }
+                }
+                Button("管理凭据") { prepareCredentials(job) }
                 if job.flow == .store || job.flow == .beta { Button("账户设置") { loginBeta = job.flow == .beta; login = true } }
                 Divider()
                 Button("删除记录及文件…", role: .destructive) { removing = job }
-            }.fixedSize().accessibilityLabel("更多操作，\(job.name)")
-        }.controlSize(.regular).disabled(model.action != nil)
+            }.fixedSize().accessibilityLabel("更多操作，\(job.name)").disabled(model.action != nil)
+        }.controlSize(.regular)
     }
     private func openCredential(_ id: UUID) { selectedCredential = id; page = .credentials }
-    private func continueWithCredentials() { if model.jobs.isEmpty { page = .store } else { showHistory() } }
+    private func continueWithCredentials() {
+        switch credentialReturn {
+        case .download(let plan): downloadPreparation = plan
+        case .job(let id, _):
+            if let job = model.jobs.first(where: { $0.id == id }), model.artifact(job, clear: true) == nil { queue.enqueueDecryption(job) }
+            credentialReturn = nil; showHistory()
+        case nil: if model.jobs.isEmpty { page = .store } else { showHistory() }
+        }
+    }
+    private func prepareCredentials(_ job: LocalJob) { credentialReturn = .job(job.id, job.name); page = .credentials }
+    private func continuePreparation() {
+        guard let action = preparationAction else { return }
+        preparationAction = nil
+        switch action {
+        case .credentials(let plan): credentialReturn = .download(plan); page = .credentials
+        case .accounts(let plan): planAfterLogin = plan; loginBeta = plan.beta; login = true
+        }
+    }
+    private func resumeAccountActions() {
+        resumeStoreRequest()
+        if let plan = planAfterLogin { planAfterLogin = nil; downloadPreparation = plan }
+    }
+    private func manageQueueAccount(_ operation: MacQueuedOperation) {
+        do { try queue.selectRequiredAccount(operation) } catch { model.message = model.friendly(error) }
+        if queue.waitingReason(operation) != nil { loginBeta = operation.kind == .beta; login = true }
+    }
     private func showHistory() { historyFilter = .all; historyQuery = ""; page = .history }
     private var presentingSheet: Bool {
-        login || detail != nil || version != nil || webFile != nil || model.askingCode || removing != nil || model.message != nil
+        login || downloadPreparation != nil || detail != nil || version != nil || webFile != nil || model.askingCode || removing != nil || model.message != nil
     }
     private var deviceBusy: Bool {
         guard let action = model.action else { return false }
@@ -438,6 +526,10 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
         }
     }
     private func requestStore(_ app: AppResult, kind: PendingStoreRequest.Kind, replacing: LocalJob? = nil, version: String? = nil) {
+        if case .latest = kind {
+            downloadPreparation = MacDownloadPlan(name: app.trackName, app: app, version: version, replacing: replacing)
+            return
+        }
         let request = PendingStoreRequest(app: app, kind: kind, replacing: replacing, version: version)
         guard model.canAttemptStoreOperation else { pendingStoreRequest = request; loginBeta = false; login = true; return }
         performStoreRequest(request)
@@ -450,12 +542,14 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     }
     private func performStoreRequest(_ request: PendingStoreRequest) {
         switch request.kind {
-        case .latest: showHistory(); run("正在下载 IPA") { try await model.download(request.app, version: request.version, replacing: request.replacing) }
+        case .latest: downloadPreparation = MacDownloadPlan(name: request.app.trackName, app: request.app, version: request.version, replacing: request.replacing)
         case .versions: run("正在读取版本") { let versions = try await model.versions(for: request.app); version = VersionSelection(app: request.app, versions: versions) }
         case .acquire: run("正在请求授权") {
             try await model.acquire(request.app)
             feedback = "已获取 “" + request.app.trackName + "” 的免费授权。"
-            if let job = request.replacing { try await model.download(request.app, version: job.version, replacing: job) }
+            if let job = request.replacing {
+                downloadPreparation = MacDownloadPlan(name: request.app.trackName, app: request.app, version: job.version, replacing: job)
+            }
         }
         }
     }
@@ -471,19 +565,19 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     }
     private func search() {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !term.isEmpty && model.action == nil else { return }
+        guard !term.isEmpty && !searchLoading else { return }
         let country = model.country
         let token = searchRequest.begin()
-        searchProblem = nil
-        run("正在搜索") {
-            defer { searchRequest.finish(token) }
+        searchProblem = nil; searchLoading = true
+        catalogTask = Task { @MainActor in
+            defer { if searchRequest.finish(token) { searchLoading = false } }
             do {
                 let found = try await AppCatalog.search(term, country: country)
                 guard searchRequest.contains(token), model.country == country else { return }
                 results = found; resultTerm = term; searched = true
                 if !found.contains(where: { $0.id == selectedApp }) { selectedApp = nil }
             } catch {
-                guard searchRequest.contains(token), model.country == country else { return }
+                guard !Task.isCancelled && searchRequest.contains(token), model.country == country else { return }
                 searchProblem = model.friendly(error)
             }
         }
@@ -504,7 +598,6 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
             }
         }
     }
-    private func download(_ app: AppResult, version: String? = nil) { showHistory(); run("正在下载 IPA") { try await model.download(app, version: version) } }
     private func run(_ title: String, operation: @escaping @MainActor () async throws -> Void) {
         guard model.action == nil else { return }
         if page == .history && (title.contains("下载") || title.contains("解密") || title.contains("导入")) { historyFilter = .all; historyQuery = "" }
@@ -515,27 +608,27 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
             do { try await operation() } catch { model.message = model.friendly(error) }
         }
     }
+    private func updateVerificationPresentation() {
+        if !model.askingCode { workspaceVerification = false; return }
+        guard !workspaceVerification, !login, detail == nil, version == nil,
+              downloadPreparation == nil, webFile == nil, removing == nil,
+              model.message == nil, !MacCommandContext.hasModal else { return }
+        workspaceVerification = true
+    }
     private func continueWhenIdle() {
         // An explicitly requested download resumes before queued background work.
         guard model.action == nil, !presentingSheet, pendingStoreRequest == nil, detailAction == nil else { return }
-        if !queuedIPA.isEmpty { importNextQueuedIPA() }
-        else if MacCatalogLoading.shouldLoadBeta(visible: page == .beta, connected: model.betaConnected,
+        queue.startIfPossible()
+        guard model.action == nil else { return }
+        if MacCatalogLoading.shouldLoadBeta(visible: page == .beta, connected: model.betaConnected,
                     busy: false, loaded: testsLoaded, failed: testsProblem != nil) { loadTests() }
     }
-    private func importNextQueuedIPA() {
-        guard model.action == nil, !presentingSheet, !queuedIPA.isEmpty else { return }
-        let url = queuedIPA.removeFirst()
-        showHistory()
-        run("正在导入 IPA") {
-            try await model.importIPA(url)
-            feedback = "已导入 “" + url.lastPathComponent + "”。"
-        }
-    }
     private func importIPA() {
-        guard model.action == nil else { return }; let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension: "ipa") ?? .data]; panel.allowsMultipleSelection = false
+        guard !deviceBusy else { return }; let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension: "ipa") ?? .data]; panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             guard url.pathExtension.lowercased() == "ipa" else { model.message = "请选择 .ipa 格式的应用包。"; return }
-            queuedIPA.append(url); importNextQueuedIPA()
+            queue.enqueueImport(url); showHistory()
+            feedback = queue.storageProblem ?? "已加入导入队列。"
         }
     }
     private func export(_ url: URL) {

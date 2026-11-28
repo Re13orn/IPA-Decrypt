@@ -58,6 +58,13 @@ private struct ScreenshotSelection: Identifiable { let url: URL; var id: URL { u
     @State private var expandedNotes = false
     @State private var viewing: ScreenshotSelection?
     @State private var tabletPreviews = false
+    private var transferBusy: Bool {
+        #if os(macOS)
+        false
+        #else
+        model.action != nil
+        #endif
+    }
     private var app: AppResult { details ?? selection.app }
     private var storeURL: URL { URL(string: "https://apps.apple.com/\(selection.country.lowercased())/app/id\(app.id)")! }
     private var previewURLs: [URL] {
@@ -132,12 +139,12 @@ private struct ScreenshotSelection: Identifiable { let url: URL; var id: URL { u
                     HStack {
                         Button("下载 IPA") { onDownload(app) }.buttonStyle(.borderedProminent)
                         Menu {
-                            if app.price == 0 { Button("获取免费授权") { onAcquire(app) } }
+                            if app.price == 0 { Button("获取免费授权") { onAcquire(app) }.disabled(model.action != nil) }
                             Button("复制 App ID") { copy(String(app.id)) }
                             Button("复制 Bundle ID") { copy(app.bundleId) }
                             ShareLink(item: storeURL) { Label("分享商店链接", systemImage: "square.and.arrow.up") }
                         } label: { Image(systemName: "ellipsis.circle").font(.title3).frame(minWidth: 32, minHeight: 32) }
-                    }.disabled(model.action != nil)
+                    }.disabled(transferBusy)
                 }
                 Spacer(minLength: 0)
             }
