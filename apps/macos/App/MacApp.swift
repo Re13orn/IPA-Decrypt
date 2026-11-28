@@ -36,9 +36,7 @@ import UniformTypeIdentifiers
                 }
         }.defaultSize(width: 1180, height: 790)
         .commands {
-            CommandGroup(after: .newItem) {
-                Button("导入 IPA…") { NotificationCenter.default.post(name: .init("ImportIPA"), object: nil) }.keyboardShortcut("o")
-            }
+            MacWorkspaceCommands()
         }
     }
 }
@@ -84,6 +82,9 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var pendingStoreRequest: PendingStoreRequest?
     @State private var incomingCredential: URL?
     @State private var selectedCredential: UUID?
+    @State private var selectedApp: UInt64?
+    private enum SearchField: Hashable { case store, history }
+    @FocusState private var searchFocus: SearchField?
 
     var body: some View {
         NavigationSplitView {
@@ -98,12 +99,6 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     Button("导入本地 IPA…", systemImage: "square.and.arrow.down") { importIPA() }.buttonStyle(.plain)
                 }
             }.disabled(deviceBusy).listStyle(.sidebar).navigationTitle("IPA 解密")
-            .safeAreaInset(edge: .bottom) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Mac 独立版", systemImage: "desktopcomputer").font(.headline)
-                    Text("下载 · 解密 · 设备凭据").font(.caption).foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, alignment: .leading).padding()
-            }
             .navigationSplitViewColumnWidth(min: 210, ideal: 225, max: 260)
         } detail: {
             Group {
@@ -121,7 +116,14 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     if let action = model.action { HStack { ProgressView().controlSize(.small); Text(model.automaticStoreLoginStatus ?? action).font(.caption) } }
                 }
                 ToolbarItem {
-                    Button("Apple 账户", systemImage: "person.crop.circle") { loginBeta = page == .beta; login = true }.disabled(model.action != nil)
+                    if page == .store || page == .beta {
+                        ServiceAccountMenu(model: model, beta: page == .beta, compact: true) {
+                            loginBeta = page == .beta; login = true
+                        }.menuStyle(.borderlessButton)
+                    } else {
+                        Button("账户设置…", systemImage: "person.crop.circle") { loginBeta = false; login = true }
+                            .help("管理 App Store 与 TestFlight 账户").disabled(model.action != nil)
+                    }
                 }
             }
         }
@@ -131,7 +133,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     onDownload: { detailAction = .download($0); detail = nil },
                     onVersions: { detailAction = .versions($0); detail = nil },
                     onAcquire: { detailAction = .acquire($0); detail = nil })
-                    .toolbar { ToolbarItem { Button("关闭") { detail = nil } } }
+                    .toolbar { ToolbarItem { Button("关闭") { detail = nil }.keyboardShortcut(.cancelAction) } }
             }.frame(width: 860, height: 760)
         }
         .sheet(isPresented: $login, onDismiss: resumeStoreRequest) { MacAccounts(model: model, beta: $loginBeta) }
@@ -162,7 +164,12 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
         .confirmationDialog("删除记录及其 IPA 文件？", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
             Button("删除", role: .destructive) { if let removing { do { try model.removeJob(removing) } catch { model.message = model.friendly(error) } }; removing = nil }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .init("ImportIPA"))) { _ in importIPA() }
+        .focusedSceneValue(\.macWorkspaceActions, MacWorkspaceActions(
+            navigate: { if !deviceBusy { page = $0 } },
+            find: focusSearch, refresh: refreshPage, importIPA: importIPA,
+            canNavigate: !deviceBusy && !presentingSheet,
+            canRefresh: !presentingSheet && model.action == nil && (page == .store || (page == .beta && model.betaConnected)),
+            canImport: !presentingSheet && model.action == nil))
         .onChange(of: model.accounts.activeBeta) { tests = []; testsLoaded = false; testsProblem = nil; testsNeedReauth = false }
         .onChange(of: model.country) { results = []; searched = false }
         .onOpenURL { url in
@@ -173,8 +180,11 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     private var storeView: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                TextField("名称、App ID、Bundle ID 或商店链接", text: $query).textFieldStyle(.roundedBorder).onSubmit(search)
-                Button("搜索", action: search).keyboardShortcut(.return, modifiers: []).disabled(query.trimmingCharacters(in: .whitespaces).isEmpty || model.action != nil)
+                TextField("名称、App ID、Bundle ID 或商店链接", text: $query)
+                    .textFieldStyle(.roundedBorder).focused($searchFocus, equals: .store)
+                    .onSubmit(search).accessibilityLabel("搜索 App Store")
+                if model.action == "正在搜索" { ProgressView().controlSize(.small).accessibilityLabel("正在搜索") }
+                Button("搜索", action: search).disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.action != nil)
                 Menu {
                     Button("自动 · " + Storefronts.name(model.automaticCountry)) { model.region = "" }
                     Divider()
@@ -184,9 +194,6 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 } label: { Label(Storefronts.name(model.country), systemImage: "globe") }
                 .disabled(model.action != nil)
             }.padding()
-            Divider()
-            ServiceAccountMenu(model: model, beta: false) { loginBeta = false; login = true }
-                .menuStyle(.borderlessButton).padding(.horizontal).padding(.vertical, 10)
             Divider()
             if model.storeNeedsReauth {
                 HStack(spacing: 12) {
@@ -199,15 +206,16 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     Button(model.storeNeedsReauth ? "重新登录" : "登录 App Store") { loginBeta = false; login = true }.disabled(model.action != nil)
                 }.padding().background(Color.orange.opacity(0.08))
             }
-            if model.action == "正在搜索" { Spacer(); ProgressView("正在搜索 App Store…"); Spacer() }
-            else if results.isEmpty { ContentUnavailableView(searched ? "未找到应用" : "查找 App Store 应用", systemImage: "magnifyingglass", description: Text(searched ? "请尝试其他名称、应用链接或商店地区。" : "输入应用名称、App ID、Bundle ID 或 App Store 链接。")) }
+            if model.action == "正在搜索" && results.isEmpty { Spacer(); ProgressView("正在搜索 App Store…"); Spacer() }
+            else if results.isEmpty { ContentUnavailableView(searched ? "未找到应用" : "查找 App Store 应用", systemImage: "magnifyingglass", description: Text(searched ? "请尝试其他名称、应用链接或商店地区。" : "输入应用名称、App ID、Bundle ID 或 App Store 链接。"))
+                .frame(maxWidth: .infinity, maxHeight: .infinity) }
             else {
                 HStack {
                     Text("\(results.count) 个结果").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Text("点击应用查看详情").font(.caption).foregroundStyle(.secondary)
                 }.padding(.horizontal).padding(.vertical, 8)
-                List(results) { app in
+                List(results, selection: $selectedApp) { app in
                     HStack(spacing: 14) {
                         Button { detail = AppSelection(app: app, country: model.country) } label: { AppListingLabel(app: app) }
                             .buttonStyle(.plain).accessibilityLabel("查看详情，\(app.trackName)")
@@ -222,16 +230,30 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                         .menuStyle(.borderlessButton).fixedSize()
                         .accessibilityLabel("更多选项，\(app.trackName)").help("历史版本与免费授权")
                         .disabled(model.action != nil)
-                    }.padding(.vertical, 6)
+                    }.padding(.vertical, 4).tag(app.id)
+                    .contextMenu {
+                        Button("查看详情") { detail = AppSelection(app: app, country: model.country) }
+                        Divider()
+                        Button("下载最新版本") { requestStore(app, kind: .latest) }.disabled(model.action != nil)
+                        Button("选择历史版本…") { requestStore(app, kind: .versions) }.disabled(model.action != nil)
+                        Button("复制 Bundle ID") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(app.bundleId, forType: .string)
+                        }
+                    }
+                }
+                .onKeyPress(.return) {
+                    guard let app = results.first(where: { $0.id == selectedApp }) else { return .ignored }
+                    detail = AppSelection(app: app, country: model.country)
+                    return .handled
                 }
             }
-        }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
     private var betaView: some View {
         VStack(spacing: 0) {
             HStack {
-                ServiceAccountMenu(model: model, beta: true) { loginBeta = true; login = true }.menuStyle(.borderlessButton)
-                if testsLoaded { Text("\(tests.count) 个 App").font(.caption).foregroundStyle(.secondary) }
+                Text(testsLoaded ? "\(tests.count) 个 App" : "已加入的测试").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("刷新", systemImage: "arrow.clockwise") { loadTests() }.disabled(!model.betaConnected || model.action != nil)
             }.fixedSize(horizontal: false, vertical: true).padding()
@@ -284,7 +306,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 TextField("搜索名称、版本或 Bundle ID", text: $historyQuery).textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("搜索处理记录")
+                    .accessibilityLabel("搜索处理记录").focused($searchFocus, equals: .history)
                 Picker("状态", selection: $historyFilter) {
                     ForEach(JobListFilter.allCases) { Text($0.rawValue).tag($0) }
                 }.pickerStyle(.segmented).frame(maxWidth: 320)
@@ -320,7 +342,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 }.padding(.vertical, 10)
             } }
             }
-        }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
     private func historyActions(_ job: LocalJob) -> some View {
         HStack(spacing: 10) {
@@ -359,6 +381,9 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     private func openCredential(_ id: UUID) { selectedCredential = id; page = .credentials }
     private func continueWithCredentials() { if model.jobs.isEmpty { page = .store } else { showHistory() } }
     private func showHistory() { historyFilter = .all; historyQuery = ""; page = .history }
+    private var presentingSheet: Bool {
+        login || detail != nil || version != nil || webFile != nil || model.askingCode || removing != nil
+    }
     private var deviceBusy: Bool {
         guard let action = model.action else { return false }
         return ["正在提取本机模型", "正在提取设备凭据", "正在测试设备连接", "正在扫描设备许可证", "正在提取所选许可证", "正在全部提取并去重"].contains(action)
@@ -392,7 +417,27 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
         }
         }
     }
-    private func search() { run("正在搜索") { results = []; searched = false; results = try await model.catalog(query); searched = true } }
+    private func focusSearch() {
+        guard !deviceBusy else { return }
+        let target: SearchField = page == .history ? .history : .store
+        if target == .store { page = .store }
+        Task { @MainActor in
+            await Task.yield()
+            searchFocus = target
+        }
+    }
+    private func refreshPage() {
+        if page == .store { search() }
+        else if page == .beta { loadTests() }
+    }
+    private func search() {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return }
+        run("正在搜索") {
+            let found = try await model.catalog(term)
+            results = found; selectedApp = nil; searched = true
+        }
+    }
     private func loadTests() {
         guard let account = model.accounts.activeBeta, model.action == nil else { return }
         model.action = "正在读取测试目录"; testsProblem = nil; testsNeedReauth = false
