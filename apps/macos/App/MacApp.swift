@@ -63,6 +63,11 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var query = ""
     @State private var results: [AppResult] = []
     @State private var searched = false
+    @State private var resultTerm = ""
+    @State private var searchProblem: String?
+    @State private var searchRequest = LatestViewRequest()
+    @State private var feedback: String?
+    @State private var queuedIPA: [URL] = []
     @State private var historyQuery = ""
     @State private var historyFilter: JobListFilter = .all
     @State private var testsLoaded = false
@@ -85,6 +90,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var selectedApp: UInt64?
     private enum SearchField: Hashable { case store, history }
     @FocusState private var searchFocus: SearchField?
+    @State private var focusStoreOnAppear = false
 
     var body: some View {
         NavigationSplitView {
@@ -96,7 +102,8 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     ForEach([MacPage.credentials, .enrollment, .device]) { item in Label(item.rawValue, systemImage: item.icon).tag(item) }
                 }
                 Section {
-                    Button("导入本地 IPA…", systemImage: "square.and.arrow.down") { importIPA() }.buttonStyle(.plain)
+                    Button("导入本地 IPA…", systemImage: "square.and.arrow.down") { importIPA() }
+                        .buttonStyle(.plain).disabled(model.action != nil)
                 }
             }.disabled(deviceBusy).listStyle(.sidebar).navigationTitle("IPA 解密")
             .navigationSplitViewColumnWidth(min: 210, ideal: 225, max: 260)
@@ -111,6 +118,16 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 case .device: CredentialExtractionView(model: model, viewCredential: openCredential, useCredentials: continueWithCredentials)
                 }
             }.navigationTitle((page ?? .store).rawValue)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let feedback {
+                    HStack(spacing: 10) {
+                        Label(feedback, systemImage: "checkmark.circle").font(.callout).textSelection(.enabled)
+                        Spacer()
+                        Button { self.feedback = nil } label: { Image(systemName: "xmark") }
+                            .buttonStyle(.borderless).help("关闭提示").accessibilityLabel("关闭提示")
+                    }.padding(12).background(.bar)
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     if let action = model.action { HStack { ProgressView().controlSize(.small); Text(model.automaticStoreLoginStatus ?? action).font(.caption) } }
@@ -168,13 +185,25 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
             navigate: { if !deviceBusy { page = $0 } },
             find: focusSearch, refresh: refreshPage, importIPA: importIPA,
             canNavigate: !deviceBusy && !presentingSheet,
-            canRefresh: !presentingSheet && model.action == nil && (page == .store || (page == .beta && model.betaConnected)),
+            canRefresh: !presentingSheet && model.action == nil && ((page == .store && !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || (page == .beta && model.betaConnected)),
             canImport: !presentingSheet && model.action == nil))
         .onChange(of: model.accounts.activeBeta) { tests = []; testsLoaded = false; testsProblem = nil; testsNeedReauth = false }
-        .onChange(of: model.country) { results = []; searched = false }
+        .onChange(of: model.country) {
+            searchRequest.invalidate(); results = []; selectedApp = nil; searched = false; searchProblem = nil
+        }
+        .onChange(of: model.action) { continueWhenIdle() }
+        .onChange(of: presentingSheet) { continueWhenIdle() }
         .onOpenURL { url in
-            if url.pathExtension.lowercased() == "ipa" { showHistory(); run("正在导入 IPA") { try await model.importIPA(url) } }
-            else if url.pathExtension.lowercased() == "bin" { incomingCredential = url; page = .credentials }
+            guard ["ipa", "bin"].contains(url.pathExtension.lowercased()) else { return }
+            guard !presentingSheet && NSApp.keyWindow?.sheetParent == nil && NSApp.keyWindow?.attachedSheet == nil else {
+                model.message = "请先完成或关闭当前窗口，再打开此文件。"; return
+            }
+            if url.pathExtension.lowercased() == "ipa" {
+                queuedIPA.append(url)
+                if model.action == nil { importNextQueuedIPA() }
+                else { feedback = "已加入导入队列，当前任务完成后继续。" }
+            } else if model.action == nil { incomingCredential = url; page = .credentials }
+            else { model.message = "请等待当前任务完成后，再打开凭据文件。" }
         }
     }
     private var storeView: some View {
@@ -206,12 +235,19 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                     Button(model.storeNeedsReauth ? "重新登录" : "登录 App Store") { loginBeta = false; login = true }.disabled(model.action != nil)
                 }.padding().background(Color.orange.opacity(0.08))
             }
+            if let searchProblem {
+                HStack(spacing: 12) {
+                    Label(searchProblem, systemImage: "exclamationmark.circle").font(.callout).textSelection(.enabled)
+                    Spacer()
+                    Button("重试", action: search).disabled(model.action != nil)
+                }.padding(12).background(Color.orange.opacity(0.08))
+            }
             if model.action == "正在搜索" && results.isEmpty { Spacer(); ProgressView("正在搜索 App Store…"); Spacer() }
             else if results.isEmpty { ContentUnavailableView(searched ? "未找到应用" : "查找 App Store 应用", systemImage: "magnifyingglass", description: Text(searched ? "请尝试其他名称、应用链接或商店地区。" : "输入应用名称、App ID、Bundle ID 或 App Store 链接。"))
                 .frame(maxWidth: .infinity, maxHeight: .infinity) }
             else {
                 HStack {
-                    Text("\(results.count) 个结果").font(.caption).foregroundStyle(.secondary)
+                    Text("“\(resultTerm)” · \(results.count) 个结果").lineLimit(1).truncationMode(.middle).font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Text("点击应用查看详情").font(.caption).foregroundStyle(.secondary)
                 }.padding(.horizontal).padding(.vertical, 8)
@@ -239,6 +275,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                         Button("复制 Bundle ID") {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(app.bundleId, forType: .string)
+                            feedback = "已复制 Bundle ID。"
                         }
                     }
                 }
@@ -249,6 +286,9 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                 }
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onAppear {
+            if focusStoreOnAppear { searchFocus = .store; focusStoreOnAppear = false }
+        }
     }
     private var betaView: some View {
         VStack(spacing: 0) {
@@ -339,7 +379,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                         }.font(.callout)
                     }
                     historyActions(job)
-                }.padding(.vertical, 10)
+                }.padding(.vertical, 10).fixedSize(horizontal: false, vertical: true)
             } }
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -382,7 +422,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     private func continueWithCredentials() { if model.jobs.isEmpty { page = .store } else { showHistory() } }
     private func showHistory() { historyFilter = .all; historyQuery = ""; page = .history }
     private var presentingSheet: Bool {
-        login || detail != nil || version != nil || webFile != nil || model.askingCode || removing != nil
+        login || detail != nil || version != nil || webFile != nil || model.askingCode || removing != nil || model.message != nil
     }
     private var deviceBusy: Bool {
         guard let action = model.action else { return false }
@@ -406,6 +446,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
         guard let request = pendingStoreRequest else { return }
         pendingStoreRequest = nil
         if model.storeConnected { performStoreRequest(request) }
+        else { continueWhenIdle() }
     }
     private func performStoreRequest(_ request: PendingStoreRequest) {
         switch request.kind {
@@ -413,18 +454,16 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
         case .versions: run("正在读取版本") { let versions = try await model.versions(for: request.app); version = VersionSelection(app: request.app, versions: versions) }
         case .acquire: run("正在请求授权") {
             try await model.acquire(request.app)
+            feedback = "已获取 “" + request.app.trackName + "” 的免费授权。"
             if let job = request.replacing { try await model.download(request.app, version: job.version, replacing: job) }
         }
         }
     }
     private func focusSearch() {
         guard !deviceBusy else { return }
-        let target: SearchField = page == .history ? .history : .store
-        if target == .store { page = .store }
-        Task { @MainActor in
-            await Task.yield()
-            searchFocus = target
-        }
+        if page == .history { searchFocus = .history }
+        else if page == .store { searchFocus = .store }
+        else { focusStoreOnAppear = true; page = .store }
     }
     private func refreshPage() {
         if page == .store { search() }
@@ -432,17 +471,28 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     }
     private func search() {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !term.isEmpty else { return }
+        guard !term.isEmpty && model.action == nil else { return }
+        let country = model.country
+        let token = searchRequest.begin()
+        searchProblem = nil
         run("正在搜索") {
-            let found = try await model.catalog(term)
-            results = found; selectedApp = nil; searched = true
+            defer { searchRequest.finish(token) }
+            do {
+                let found = try await AppCatalog.search(term, country: country)
+                guard searchRequest.contains(token), model.country == country else { return }
+                results = found; resultTerm = term; searched = true
+                if !found.contains(where: { $0.id == selectedApp }) { selectedApp = nil }
+            } catch {
+                guard searchRequest.contains(token), model.country == country else { return }
+                searchProblem = model.friendly(error)
+            }
         }
     }
     private func loadTests() {
-        guard let account = model.accounts.activeBeta, model.action == nil else { return }
+        guard let account = model.accounts.activeBeta, model.action == nil, !presentingSheet else { return }
         model.action = "正在读取测试目录"; testsProblem = nil; testsNeedReauth = false
         Task {
-            defer { model.action = nil }
+            defer { model.action = nil; continueWhenIdle() }
             do {
                 let entries = try await model.betaCatalog()
                 guard model.accounts.activeBeta == account else { return }
@@ -458,18 +508,45 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     private func run(_ title: String, operation: @escaping @MainActor () async throws -> Void) {
         guard model.action == nil else { return }
         if page == .history && (title.contains("下载") || title.contains("解密") || title.contains("导入")) { historyFilter = .all; historyQuery = "" }
+        feedback = nil
         model.action = title
-        Task { defer { model.action = nil }; do { try await operation() } catch { model.message = model.friendly(error) } }
+        Task {
+            defer { model.action = nil; continueWhenIdle() }
+            do { try await operation() } catch { model.message = model.friendly(error) }
+        }
+    }
+    private func continueWhenIdle() {
+        // An explicitly requested download resumes before queued background work.
+        guard model.action == nil, !presentingSheet, pendingStoreRequest == nil, detailAction == nil else { return }
+        if !queuedIPA.isEmpty { importNextQueuedIPA() }
+        else if MacCatalogLoading.shouldLoadBeta(visible: page == .beta, connected: model.betaConnected,
+                    busy: false, loaded: testsLoaded, failed: testsProblem != nil) { loadTests() }
+    }
+    private func importNextQueuedIPA() {
+        guard model.action == nil, !presentingSheet, !queuedIPA.isEmpty else { return }
+        let url = queuedIPA.removeFirst()
+        showHistory()
+        run("正在导入 IPA") {
+            try await model.importIPA(url)
+            feedback = "已导入 “" + url.lastPathComponent + "”。"
+        }
     }
     private func importIPA() {
         guard model.action == nil else { return }; let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension: "ipa") ?? .data]; panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url { showHistory(); run("正在导入 IPA") { try await model.importIPA(url) } }
+        if panel.runModal() == .OK, let url = panel.url {
+            guard url.pathExtension.lowercased() == "ipa" else { model.message = "请选择 .ipa 格式的应用包。"; return }
+            queuedIPA.append(url); importNextQueuedIPA()
+        }
     }
     private func export(_ url: URL) {
         let panel = NSSavePanel(); panel.nameFieldStringValue = url.lastPathComponent
         if panel.runModal() == .OK, let destination = panel.url {
-            do { let scoped = destination.startAccessingSecurityScopedResource(); defer { if scoped { destination.stopAccessingSecurityScopedResource() } }; try Data(contentsOf: url, options: .mappedIfSafe).write(to: destination, options: .atomic) }
-            catch { model.message = "无法导出文件，请检查目标位置和剩余存储。" }
+            run("正在导出 IPA") {
+                do {
+                    try await Task.detached(priority: .userInitiated) { try IPAFileExporter.copy(from: url, to: destination) }.value
+                    feedback = "已导出 “" + destination.lastPathComponent + "”。"
+                } catch { throw LabError("无法导出文件，请检查目标位置和剩余存储。") }
+            }
         }
     }
     private func share(_ url: URL) {
@@ -502,7 +579,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack { Text("Apple 账户").font(.title2.bold()); Spacer(); Button("完成") { dismiss() }.disabled(busy) }
+            HStack { Text("Apple 账户").font(.title2.bold()); Spacer(); Button("完成") { dismiss() }.keyboardShortcut(.cancelAction).disabled(busy) }
             Picker("服务", selection: $beta) { Text("App Store").tag(false); Text("TestFlight").tag(true) }.pickerStyle(.segmented).disabled(busy)
             ScrollView {
                 Form {
@@ -632,6 +709,8 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var manual = ""
     @State private var query = ""
     @State private var names: [String: String] = [:]
+    @State private var nameRequest = LatestViewRequest()
+    @State private var nameRequestTarget: String?
     @State private var loading = false
     @State private var problem: String?
     private var ids: [String] { selection.versions.ids.filter { query.isEmpty || $0.contains(query) || (names[$0]?.localizedCaseInsensitiveContains(query) ?? false) } }
@@ -663,7 +742,7 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
             if loading { ProgressView("正在读取版本号…") }
             if let problem { Text(problem).font(.callout).foregroundStyle(.red) }
             HStack {
-                Button("取消") { dismiss() }; Spacer()
+                Button("取消") { dismiss() }.keyboardShortcut(.cancelAction); Spacer()
                 Button("读取版本号") { if let target { Task { await readName(target) } } }.disabled(target == nil || loading)
                 Button("下载所选版本") { if let target { download(target) } }.disabled(target == nil || loading).buttonStyle(.borderedProminent)
             }
@@ -673,16 +752,23 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                Storefronts.country(for: model.activeProfile(beta: false)?.storefront) == model.country { names[latest] = name }
         }
         .task(id: selected) { if !selected.isEmpty && names[selected] == nil { await readName(selected) } }
+        .onChange(of: target) {
+            if nameRequestTarget != target { nameRequest.invalidate(); loading = false; problem = nil }
+        }
+        .onDisappear { nameRequest.invalidate() }
     }
     private func readName(_ id: String) async {
+        let token = nameRequest.begin()
+        nameRequestTarget = id
         loading = true; problem = nil
-        defer { loading = false }
+        defer { if nameRequest.finish(token) { loading = false } }
         do {
             let name = try await model.versionName(id, for: selection.app)
-            if !Task.isCancelled {
-                if let name, !name.isEmpty { names[id] = name }
-                else { problem = "此版本暂未提供版本号。" }
-            }
-        } catch { if !Task.isCancelled { problem = model.friendly(error) } }
+            guard !Task.isCancelled && nameRequest.contains(token) && target == id else { return }
+            if let name, !name.isEmpty { names[id] = name }
+            else { problem = "此版本暂未提供版本号。" }
+        } catch {
+            if !Task.isCancelled && nameRequest.contains(token) && target == id { problem = model.friendly(error) }
+        }
     }
 }
