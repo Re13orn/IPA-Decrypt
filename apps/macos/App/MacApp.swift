@@ -767,14 +767,22 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
     @State private var code = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("双重认证").font(.title2.bold())
+            VStack(spacing: 12) {
+                Image(systemName: "lock.shield").font(.system(size: 38, weight: .light)).foregroundStyle(.tint)
+                Text("双重认证").font(.title2.bold())
+                Text(model.pickingBetaPhone ? "选择用于接收验证码的受信任号码。" : "输入受信任设备上显示或短信收到的 6 位验证码。")
+                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }.frame(maxWidth: .infinity)
             if model.pickingBetaPhone {
                 Text("选择短信接收号码")
                 ForEach(Array(model.codePhones.enumerated()), id: \.element.id) { index, phone in Button(phone.displayNumber.isEmpty ? "受信任号码 \(index + 1)" : phone.displayNumber) { model.selectBetaPhone(phone.id) } }
                 if model.betaCanUseTrustedDevice { Button("改用受信任设备") { model.selectBetaPhone(0) } }
             } else {
-                TextField("6 位验证码", text: $code).textContentType(.oneTimeCode).textFieldStyle(.roundedBorder)
-                Button("提交验证码") { model.finishCode(code) }.disabled(code.count != 6 || !code.allSatisfy { $0.isASCII && $0.isNumber }).keyboardShortcut(.defaultAction)
+                VerificationCodeField(code: $code, submit: submitCode)
+                    .frame(maxWidth: .infinity).disabled(model.codeDeliveryBusy)
+                Button(action: submitCode) { Text("继续").frame(maxWidth: .infinity) }
+                    .buttonStyle(.borderedProminent).controlSize(.large)
+                    .disabled(code.count != 6 || model.codeDeliveryBusy).keyboardShortcut(.defaultAction)
             }
             if model.storeCodeDelivery {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -786,10 +794,17 @@ struct VersionSelection: Identifiable { let app: AppResult; let versions: StoreV
                         if wait > 0 { Text("\(wait) 秒后可重发").font(.caption) }
                     }.disabled(model.codeDeliveryBusy || wait > 0)
                 }
-                if let message = model.codeDeliveryMessage { Text(message).font(.caption) }
+                if model.codeDeliveryBusy { ProgressView("正在请求验证码…").controlSize(.small) }
+                if let message = model.codeDeliveryMessage {
+                    Text(message).font(.caption).foregroundStyle(model.codeDeliveryFailed ? Color.red : Color.secondary)
+                }
             }
-            Button("取消") { model.finishCode(nil) }.keyboardShortcut(.cancelAction)
-        }.padding(28).frame(width: 420)
+            Button("取消") { model.finishCode(nil) }.keyboardShortcut(.cancelAction).frame(maxWidth: .infinity)
+        }.padding(32).frame(width: 420)
+    }
+    private func submitCode() {
+        guard code.count == 6, code.allSatisfy({ $0.isASCII && $0.isNumber }), !model.codeDeliveryBusy else { return }
+        model.finishCode(code)
     }
 }
 

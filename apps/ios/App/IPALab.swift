@@ -1037,16 +1037,23 @@ private struct DownloadProgressView: View {
                         betaPhoneChoices
                     } else {
                         Section {
-                            Text("输入 Apple 发送的 6 位验证码。")
-                            TextField("验证码", text: $code).textContentType(.oneTimeCode).keyboardType(.numberPad)
-                            Button("提交验证码") { model.finishCode(code) }
-                                .disabled(!validCode(code) || model.codeDeliveryBusy)
-                        }
+                            VStack(spacing: 20) {
+                                Image(systemName: "lock.shield").font(.system(size: 40, weight: .light)).foregroundStyle(.tint)
+                                Text("输入验证码").font(.title2.bold())
+                                Text("输入受信任设备上显示或短信收到的 6 位验证码。")
+                                    .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                                VerificationCodeField(code: $code, submit: submitCode)
+                                    .disabled(model.codeDeliveryBusy)
+                                Button(action: submitCode) { Text("继续").frame(maxWidth: .infinity) }
+                                    .buttonStyle(.borderedProminent).controlSize(.large)
+                                    .disabled(!validCode(code) || model.codeDeliveryBusy)
+                            }.frame(maxWidth: .infinity).padding(.vertical, 16)
+                        }.listRowBackground(Color.clear)
                     }
                     if model.storeCodeDelivery { codeDeliveryOptions }
                 }.navigationTitle("双重认证").navigationBarTitleDisplayMode(.inline)
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { model.finishCode(nil) } } }
-            }.presentationDetents(model.storeCodeDelivery || model.pickingBetaPhone ? [.large] : [.medium])
+            }.presentationDetents([.large])
     }
     private var codeDeliveryOptions: some View {
         Section("没有收到验证码？") {
@@ -1125,6 +1132,10 @@ private struct DownloadProgressView: View {
         }
     }
 
+    private func submitCode() {
+        guard validCode(code), !model.codeDeliveryBusy else { return }
+        model.finishCode(code)
+    }
     private func validCode(_ value: String) -> Bool {
         value.count == 6 && value.allSatisfy { $0.isASCII && $0.isNumber }
     }
