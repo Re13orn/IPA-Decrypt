@@ -5,30 +5,15 @@
 [![Release](https://img.shields.io/github/v/release/Re13orn/IPA-Decrypt)](https://github.com/Re13orn/IPA-Decrypt/releases/latest)
 [![平台](https://img.shields.io/badge/platforms-macOS%2015%2B%20%7C%20iOS%2016%2B-blue)](#下载)
 [![许可证 GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![macOS 兼容性](https://github.com/Re13orn/IPA-Decrypt/actions/workflows/macos-compatibility.yml/badge.svg)](https://github.com/Re13orn/IPA-Decrypt/actions/workflows/macos-compatibility.yml)
 
-**下载 App Store 与 TestFlight 应用，解密并导出 IPA 包。**
+**下载并解密 App Store 与 TestFlight 应用，导出解密 IPA。**
 
-支持 **TestFlight 测试应用**与 **App Store 历史版本**。提取并保存 FairPlay 凭据后，可重复解密许可证匹配的多个应用或版本。
+- **TestFlight**：下载、解密已加入测试的应用。
+- **历史版本**：获取 App Store 提供的旧版本。
+- **凭据复用**：一次提取，重复解密许可证匹配的应用与版本。
+- **两条路线**：Mac 本机模型无需越狱 iPhone；越狱设备提取的凭据可导入 iOS 版使用。
 
-[下载 Mac 版](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.9/IPA-Decrypt-macOS-1.0.9-arm64.dmg) · [下载 iOS 版](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.7/IPA-Decrypt-iOS-1.0.3-unsigned.ipa)
-
-### 主要优势
-
-- **App Store + TestFlight**：在同一工具中下载、解密并导出 IPA。
-- **历史版本下载**：选择 App Store 提供的旧版本，便于版本回溯与分析。
-- **提取一次，重复使用**：保存凭据，后续直接处理匹配的 IPA，无需为每个目标 App 反复在设备上执行运行时砸壳。
-- **两条设备路线**：有兼容 Mac，可从本机恢复模型，无需越狱 iPhone；没有 Mac，也可将从越狱 iPhone / iPad 提取的凭据导入 iOS 版使用。
-
-**首次：提取并保存凭据。以后：下载或导入 IPA → 匹配凭据 → 解密 → 导出解密 IPA。**
-
-| 你有什么设备？ | 如何开始 |
-| --- | --- |
-| **Apple Silicon Mac，无越狱 iPhone** | 从 Mac App Store 安装兼容的 iPhone / iPad App，恢复本机 FairPlay 模型，在 Mac 上解密。 |
-| **越狱 iPhone / iPad，无 Mac** | 提取 16 字节 `credential.bin` 后导入 iOS 版，在 iPhone / iPad 上解密。 |
-| **已有凭据** | 直接导入文件或十六进制数据；16 字节凭据可在 Mac 与 iOS 版使用。 |
-
-凭据可复用的范围由实际许可证匹配决定；本机模型供 Mac 版使用。TestFlight 需有对应测试访问权限，历史版本以 App Store 返回结果为准。[了解凭据获取方式](docs/CREDENTIALS.md)。
+凭据获取方式与适用条件见[使用指南](docs/CREDENTIALS.md)。
 
 ## 下载
 
@@ -45,15 +30,14 @@ Mac 当前采用 ad-hoc 签名，**未公证**；文件校验和系统打开方�
 
 ### macOS
 
-Mac 1.0.9 实际界面，截图时未登录账户。
-应用搜索、地区切换、下载操作及凭据工具入口。
+搜索与下载 · macOS 1.0.9
 
-![macOS 应用搜索](docs/images/macos-search.jpg)
+![macOS 应用搜索](docs/images/macos-search.png)
 
 <details>
 <summary>查看应用详情</summary>
 
-![Mac 应用详情、历史版本入口与截图](docs/images/macos-app-details.jpg)
+![Mac 应用详情、历史版本入口与截图](docs/images/macos-app-details.png)
 
 </details>
 

@@ -5,30 +5,15 @@
 [![Release](https://img.shields.io/github/v/release/Re13orn/IPA-Decrypt)](https://github.com/Re13orn/IPA-Decrypt/releases/latest)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%2015%2B%20%7C%20iOS%2016%2B-blue)](#download)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
-[![macOS compatibility](https://github.com/Re13orn/IPA-Decrypt/actions/workflows/macos-compatibility.yml/badge.svg)](https://github.com/Re13orn/IPA-Decrypt/actions/workflows/macos-compatibility.yml)
 
-**Download apps from App Store and TestFlight. Decrypt and export IPA files.**
+**Download and decrypt App Store and TestFlight apps. Export decrypted IPAs.**
 
-Supports **TestFlight beta apps** and **historical App Store versions**. Extract and save FairPlay credentials once, then reuse them to decrypt multiple apps or versions with matching licenses.
+- **TestFlight** — download and decrypt apps from your joined betas.
+- **Historical versions** — get older versions available from App Store.
+- **Reusable credentials** — extract once, decrypt more apps and versions with matching licenses.
+- **Two routes** — use a local Mac model without a jailbroken iPhone, or import credentials from a jailbroken device into the iOS app.
 
-[Download for Mac](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.9/IPA-Decrypt-macOS-1.0.9-arm64.dmg) · [Download for iOS](https://github.com/Re13orn/IPA-Decrypt/releases/download/v1.0.7/IPA-Decrypt-iOS-1.0.3-unsigned.ipa)
-
-### Key advantages
-
-- **App Store + TestFlight** — download, decrypt, and export IPAs in one tool.
-- **Historical versions** — choose older versions returned by App Store for version comparison and analysis.
-- **Extract once, reuse** — decrypt matching IPA files with saved credentials, without repeating an on-device runtime dump for every target app.
-- **Two device routes** — recover a local model on a compatible Mac without a jailbroken iPhone, or import credentials extracted from a jailbroken iPhone / iPad into the iOS app when you do not have a Mac.
-
-**First: extract and save credentials. Then: download or import an IPA → match credentials → decrypt → export the decrypted IPA.**
-
-| Your setup | How to start |
-| --- | --- |
-| **Apple Silicon Mac, no jailbroken iPhone** | Install a compatible iPhone / iPad app from the Mac App Store, recover a local FairPlay model, and decrypt on Mac. |
-| **Jailbroken iPhone / iPad, no Mac** | Extract a 16-byte `credential.bin`, import it into the iOS app, and decrypt on your iPhone / iPad. |
-| **Existing credentials** | Import a file or hex value directly; 16-byte credentials can be used by both the Mac and iOS apps. |
-
-Reuse depends on actual license compatibility; local models are used by the Mac app. TestFlight requires access to the relevant beta, and historical versions depend on App Store availability. See the [credential guide](docs/en/CREDENTIALS.md).
+See the [credential guide](docs/en/CREDENTIALS.md) for setup and compatibility.
 
 ## Download
 
@@ -45,15 +30,14 @@ Mac releases are ad-hoc signed and **not notarized**. See the installation guide
 
 ### macOS
 
-Mac 1.0.9, captured without a signed-in account.
-App search, region selection, download actions, and access to credential tools.
+Search and download · macOS 1.0.9
 
-![IPA Decrypt on macOS](docs/images/macos-search.jpg)
+![IPA Decrypt on macOS](docs/images/macos-search.png)
 
 <details>
 <summary>App details</summary>
 
-![Mac app details, version selection, and screenshots](docs/images/macos-app-details.jpg)
+![Mac app details, version selection, and screenshots](docs/images/macos-app-details.png)
 
 </details>
 
