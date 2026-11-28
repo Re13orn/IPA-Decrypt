@@ -24,6 +24,12 @@ The resulting 16-byte credentials can be used by both the Mac and iOS apps.
 
 Import `credential.bin`, or paste its 32-character hexadecimal representation. Mac also supports local model files. iOS accepts 16-byte credentials, not Mac model files.
 
+## Extract once, reuse
+
+Credential extraction and IPA decryption are separate steps. Once matching credentials are saved, they can be reused for subsequent downloads or imported IPAs without repeating an on-device runtime dump for each target app. Reuse is determined by license verification, not app counts or account labels.
+
+A 16-byte `credential.bin` can be exported and imported into either platform. Without a Mac, you can import a credential extracted from a compatible jailbroken device into the iOS app. Extraction is a separate step; the app's automated USB / SSH extraction interface is part of the Mac version. Local Mac models use a different format and are used by the Mac app.
+
 ## Use the result
 
 Downloaded or imported IPAs are checked against saved credential candidates. Account labels affect the candidate order; they do not exclude other saved 16-byte credentials. Identical byte values are tried once. Compatibility is established by license verification.
